@@ -1,0 +1,203 @@
+%% Memoir layout setup
+
+%% NOTE: You are strongly advised not to change any of them unless you
+%% know what you are doing.  These settings strongly interact in the
+%% final look of the document.
+
+% Dependencies
+\usepackage{ETHlogo}
+
+% use helvetica as default font:
+\usepackage[scaled]{helvet}
+\renewcommand\familydefault{\sfdefault} 
+
+% Turn extra space before chapter headings off.
+\setlength{\beforechapskip}{0pt}
+
+\nonzeroparskip
+\parindent=0pt
+\defaultlists
+
+% Chapter style redefinition
+\makeatletter
+
+\makepagestyle{headerWPageNr}% Create headerWPageNr style
+\if@twoside
+  \copypagestyle{headerWPageNr}{Ruled}
+  \copypagestyle{chapter}{Ruled}
+\else
+  \copypagestyle{headerWPageNr}{ruled}
+  \copypagestyle{chapter}{ruled}
+\fi
+% chapter pages have no header and center page number in footer:
+\makeoddhead{chapter}{}{}{}
+\makeevenhead{chapter}{}{}{}
+\makeoddfoot{chapter}{}{\thepage}{}
+\makeevenfoot{chapter}{}{\thepage}{}
+\makeheadrule{chapter}{\textwidth}{0pt}
+
+% all other pages have page number and chapter or section name in header without footer:
+\makeoddhead{headerWPageNr}{\rightmark}{}{\thepage}
+\makeevenhead{headerWPageNr}{\thepage}{}{\leftmark}
+\makeoddfoot{headerWPageNr}{}{}{}
+\makeevenfoot{headerWPageNr}{}{}{}
+\pagestyle{headerWPageNr}% Set page style to headerWPageNr
+
+
+\makechapterstyle{bianchimod}{%
+  \copypagestyle{abstract}{empty}
+  \chapterstyle{default}
+  \renewcommand*{\chapnamefont}{\normalfont\Large\sffamily}
+  \renewcommand*{\chapnumfont}{\normalfont\Large\sffamily}
+  \renewcommand*{\printchaptername}{%
+    \chapnamefont\centering\@chapapp}
+  \renewcommand*{\printchapternum}{\chapnumfont {\thechapter}}
+  \renewcommand*{\chaptitlefont}{\normalfont\huge\sffamily}
+  \renewcommand*{\printchaptertitle}[1]{%
+    \hrule\vskip\onelineskip \centering \chaptitlefont\textbf{\vphantom{gyM}##1}\par}
+  \renewcommand*{\afterchaptertitle}{\vskip\onelineskip \hrule\vskip
+    \afterchapskip}
+  \renewcommand*{\printchapternonum}{%
+    \vphantom{\chapnumfont {9}}\afterchapternum}}
+  
+\makechapterstyle{bianchimod2}{%
+  \renewenvironment{abstract}{\chapter*{\abstractname}}{}
+  \chapterstyle{default}
+  \definecolor{ChapGrey}{rgb}{0.6,0.6,0.6}
+  \newcommand{\LargeFont}{% Needs a ’stretchable’ font
+  	\usefont{\encodingdefault}{\sfdefault}{b}{n}%
+    \fontsize{100}{0}\selectfont\color{ChapGrey}}
+  \renewcommand*{\chapnumfont}{\LargeFont}
+  \renewcommand*{\printchaptername}{\raggedleft}
+  \renewcommand*{\printchapternum}{\chapnumfont {\thechapter}}
+  \renewcommand*{\chaptitlefont}{\normalfont\Huge\sffamily\color{black}}
+  \renewcommand*{\printchaptertitle}[1]{%
+    \raggedleft \chaptitlefont\textbf{\vphantom{gyM}##1}\par}}
+
+% Use the newly defined style
+\chapterstyle{bianchimod}
+
+\setsecheadstyle{\Large\bfseries\sffamily}
+\setsubsecheadstyle{\large\bfseries\sffamily}
+\setsubsubsecheadstyle{\bfseries\sffamily}
+\setparaheadstyle{\normalsize\bfseries\sffamily}
+\setsubparaheadstyle{\normalsize\itshape\sffamily}
+\setsubparaindent{0pt}
+
+% Set captions to a more separated style for clearness
+\captionnamefont{\sffamily\bfseries\footnotesize}
+\captiontitlefont{\sffamily\footnotesize}
+\setlength{\intextsep}{16pt}
+\setlength{\belowcaptionskip}{1pt}
+
+% Set section and TOC numbering depth to subsection
+\setsecnumdepth{subsection}
+\settocdepth{subsection}
+
+% definitions for titlepage
+\def\@advisor{}
+\newcommand{\advisor}[1]{\def\@advisor{#1}}
+\def\@supervisor{}
+\newcommand{\supervisor}[1]{\def\@supervisor{#1}}
+\def\@group{}
+\newcommand{\group}[1]{\def\@group{#1}}
+\def\@institute{}
+\newcommand{\institute}[1]{\def\@institute{#1}}
+\def\@department{}
+\newcommand{\department}[1]{\def\@department{#1}}
+\def\@school{}
+\newcommand{\school}[1]{\def\@school{#1}}
+\def\@thesistype{}
+\newcommand{\thesistype}[1]{\def\@thesistype{#1}}
+\def\@email{}
+\newcommand{\email}[1]{\def\@email{#1}}
+
+%% Title page adjustments
+% the following definition (either 0 or 1) controls the title page's layout:
+\def\centeredtitlepage{1}
+\if\centeredtitlepage1
+	% default title page from cadmo template
+	\newcommand{\maketitlepage}{
+		\begin{titlingpage}
+  			\calccentering{\unitlength}
+  			\begin{adjustwidth*}{\unitlength-24pt}{-\unitlength-24pt}
+    		\maketitle
+  			\end{adjustwidth*}
+		\end{titlingpage}
+	}
+	\pretitle{\vspace{0pt plus 0.7fill}\begin{center}\HUGE\sffamily\bfseries}
+	\posttitle{\end{center}\par}
+	\preauthor{\par\begin{center}\let\and\\\Large\sffamily}
+	\postauthor{\end{center}}
+	\predate{\par\begin{center}\Large\sffamily}
+	\postdate{\end{center}}
+
+	\renewcommand{\maketitlehooka}{\noindent\ETHlogo[2in]}
+
+	\renewcommand{\maketitlehookb}{\vspace{1in}%
+  		\par\begin{center}\Large\sffamily\@thesistype\end{center}}
+
+	\renewcommand{\maketitlehookd}{%
+  		\vfill\par
+  			\begin{flushright}
+    			\sffamily
+    			Advisors: \@supervisor, \@advisor\par
+    			\@department, \@school
+  			\end{flushright}
+	}
+
+\else
+	% alternative title page (right-aligned)
+	\newcommand{\maketitlepage}{
+		\begin{titlingpage}
+			\titlestyleright
+		\end{titlingpage}
+	}
+	\newcommand*\titlestyleright{
+		\thispagestyle{empty}
+		\sffamily
+		\vspace*{\stretch{6}}
+		\begin{flushright}
+		{\Huge\sffamily\bfseries\@title}
+		\par\noindent\rule[-1ex]{\linewidth}{2pt}\par
+		\vspace{0.5cm}
+		\emph{\huge\sffamily\@thesistype}
+		\vspace{2cm}\par
+		{\LARGE\sffamily\bfseries\@author}\par
+		{\sffamily\@email}\par
+		\vspace{1cm}
+    	{\large\textbf{Advisor}\par
+    		\@advisor\par}
+    	\vspace{0.5cm}
+    	{\large\textbf{Supervisor}\par
+    		\@supervisor\par}
+    	\vspace{1cm}
+    	{\@group\par
+    		\@institute\par
+        	\@department\par
+        	\@school\par}
+    	\vspace{1cm}
+    	{\normalsize\@date\par}
+		\end{flushright}
+		\vspace{\stretch{1}}
+		\noindent\ETHlogo[2in]
+		\pagebreak 
+    	\sffamily
+    	\thispagestyle{empty} 
+	}
+\fi
+
+\checkandfixthelayout
+
+\setlength{\droptitle}{-48pt}
+
+\makeatother
+
+% This defines how theorems should look. Best leave as is.
+\theoremstyle{plain}
+\setlength\theorempostskipamount{0pt}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "thesis"
+%%% End:

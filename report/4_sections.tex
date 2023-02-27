@@ -1,0 +1,64 @@
+\chapter{Example Chapter}
+
+Dummy text. First use of an acronym: \ac{UDP}. Only short-hand of acronym is used when it reappears: \ac{UDP}.
+
+Some Gobra and Viper code can be seen in figure~\ref{lst:echoServer} and~\ref{lst:silver_fields}, respectively.
+
+\begin{figure}
+  \begin{gobra}
+    class Server(Thread):
+      def run():
+        server_socket = create_server_socket()
+        while True:
+          client_socket = server_socket.accept()
+          data = client_socket.read_all(timeout=1)
+          if data:
+            print(client_socket.address)
+            client_socket.send(data)
+          client_socket.close()
+  \end{gobra}
+  \caption{Echo server.}
+  \label{lst:echoServer}
+\end{figure}
+
+\begin{figure}
+    \begin{myViper}
+      field f: Int
+      field g: Int
+      method get_f(arg: Ref) returns (res1: Int,
+                                      res2: Int)
+        requires acc(arg.f)
+        ensures acc(arg.f) && res1 == arg.f
+      {
+        res1 := arg.f
+      //res2 := arg.g   // Verification error: might
+                        // not have permission to
+                        // access arg.g.
+      }
+    \end{myViper}
+    \caption{A simple getter method. The assignment to the result
+        variable \vl+res2+ fails to verify because the method does
+        not have a permission to access field \vl+arg.g+.}
+    \label{lst:silver_fields}
+\end{figure}
+
+
+\section{Example Section}
+
+Dummy text.
+
+\subsection{Example Subsection}
+
+Dummy text.
+
+\subsubsection{Example Subsubsection}
+
+Dummy text.
+
+\paragraph{Example Paragraph}
+
+Dummy text.
+
+\subparagraph{Example Subparagraph}
+
+Dummy text. 

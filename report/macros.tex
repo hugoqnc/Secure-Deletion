@@ -1,0 +1,236 @@
+\usepackage{listings, silver}
+\usepackage{color, colortbl}
+\usepackage{xspace}
+\usepackage{hyphenat}
+\usepackage[normalem]{ulem} %% Crossing out text (defines \sout)
+
+\usepackage[inline]{enumitem} %% Provides inline lists, e.g. environment enumerate*
+  \setlist*[enumerate]{label=(\arabic*)}
+
+\usepackage{amsmath,amssymb,graphicx}
+\usepackage{qsymbols}
+\usepackage{stmaryrd} %% E.g. for \Mapsto
+\usepackage{multirow}
+
+\usepackage{suffix} %% Be able to declare starred macros, e.g. \foo*
+\usepackage{xparse}
+
+\newcommand*{\ListingsFontSize}{\fontsize{8.0}{8.3}\selectfont}
+\newcommand*{\SilFont}{\ttfamily\ListingsFontSize}
+
+
+
+
+
+% colors (see https://latexcolor.com/)
+\definecolor{light-gray}{gray}{0.9}
+\definecolor{darkgreen}{rgb}{0.0,0.7,0.0}
+\definecolor{darkred}{rgb}{0.55, 0.0, 0.0}
+\definecolor{persianblue}{rgb}{0.11, 0.22, 0.73}
+\definecolor{navyblue}{rgb}{0.0, 0.0, 0.5}
+\definecolor{darkpowderblue}{rgb}{0.0, 0.2, 0.6}
+\definecolor{frenchblue}{rgb}{0.0, 0.45, 0.73}
+\definecolor{burntorange}{rgb}{0.8, 0.33, 0.0}
+
+\definecolor{rowShade}{gray}{0.85}
+
+
+
+%% ****************************************************************************
+
+\newcommand*{\Figref}[1]{Fig.~\ref{fig:#1}}
+\newcommand*{\figref}{\Figref}
+\newcommand*{\Secref}[1]{Sec.~\ref{sec:#1}}
+\newcommand*{\secref}{\Secref}
+\newcommand*{\Appref}[1]{App.~\ref{sec:#1}}
+\newcommand*{\appref}{\Appref}
+\newcommand*{\Lineref}[1]{Line~\ref{line:#1}}
+\newcommand*{\lineref}[1]{line~\ref{line:#1}}
+\newcommand*{\Linerange}[2]{Lines~\ref{line:#1}-\ref{line:#2}}
+\newcommand*{\linerange}[2]{lines~\ref{line:#1}-\ref{line:#2}}
+% \newcommand*{\Sref}[1]{\hyperref[#1]{\S\ref*{#1}}}
+
+%% ****************************************************************************
+
+\newcommand*{\Ie}{I.e.\xspace}
+\newcommand*{\ie}{i.e.\xspace}
+\newcommand*{\Eg}{E.g.\xspace}
+\newcommand*{\eg}{e.g.\xspace}
+\newcommand*{\Cf}{Cf.\xspace}
+\newcommand*{\cf}{cf.\xspace}
+\newcommand*{\Wrt}{W.r.t.\xspace}
+\newcommand*{\wrt}{w.r.t.\xspace}
+
+\newcommand*{\naive}{na\"{\i}ve\xspace}
+\newcommand*{\Naive}{Na\"{\i}ve\xspace}
+
+%% ****************************************************************************
+
+% \newcommand*{\ListingsFontSize}{\fontsize{8.0}{8.3}\selectfont}
+% \newcommand*{\SilverFont}{\ttfamily\ListingsFontSize}
+% \usepackage{silver}
+
+%% listings
+\lstset{numberstyle=\small} % size of line numbers
+\lstset{mathescape=true}
+
+\newcommand{\vcode}[1]{\vipercode{#1}}
+
+
+
+% \lstset{
+%   % basicstyle={\small\fontfamily{cmtt}\selectfont}
+%   % basicstyle={\ttfamily\selectfont\footnotesize},
+%   % commentstyle={\ttfamily\selectfont\footnotesize},
+%   tabsize=2,
+%   mathescape=true,
+%   language=silver
+%   % basicstyle=\ttfamily
+% }
+
+\newcommand*{\GobraFont}{\SilFont}
+\newcommand*{\GobraFontSize}{\ListingsFontSize}
+\newcommand*{\InlineGobraFontSize}{\small}
+
+%% TODO: Add keywords (can we take them from Felix' thesis?)
+\lstdefinelanguage{gobra}{
+  language=go,
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morekeywords=[1]{ %% Keywords of the programming language subset
+    pred, implements
+  },
+  morekeywords=[2]{ %% Keywords of the specification language subset
+    requires, ensures, invariant, req, ens, pure
+  },
+  morekeywords=[3]{ %% Keywords of the proof language subset
+    fold, unfold, unfolding, in, ghost,
+    assume, assert, inhale, exhale
+  },
+  basicstyle={\GobraFont\GobraFontSize},
+  commentstyle={\color[HTML]{747678}\textit},
+  keywordstyle={[1]\color[HTML]{0005FF}},%\bfseries
+  keywordstyle={[2]\color{burntorange}},%\bfseries
+  keywordstyle={[3]\color[HTML]{EC008C}},%\bfseries
+  mathescape=true,
+  escapechar=§,
+  moredelim=**[is][\normalfont\itshape]{'}{'} 
+    %% Should use \var rather than \normalfont\itshape, but that doesn't work. 
+    % Probably because \var expects an argument.
+}
+
+\lstdefinelanguage{myViper}{
+  language=silver,
+  sensitive=true,
+  basicstyle={\GobraFont\GobraFontSize},
+  mathescape=true,
+  escapechar=§,
+  moredelim=**[is][\normalfont\itshape]{'}{'} 
+    %% Should use \var rather than \normalfont\itshape, but that doesn't work. 
+    % Probably because \var expects an argument.
+}
+
+\lstdefinelanguage{plaintext}{
+  language=,
+  % basicstyle={\GobraFont\GobraFontSize},
+  % commentstyle={\GobraFont\GobraFontSize\color{red}},
+  keywordstyle=\bfseries,
+  ndkeywordstyle=\bfseries,
+  morecomment=[l]{//},
+  mathescape=true
+}
+
+\makeatletter
+\lst@Key{countblanklines}{true}[t]%
+    {\lstKV@SetIf{#1}\lst@ifcountblanklines}
+
+\lst@AddToHook{OnEmptyLine}{%
+    \lst@ifnumberblanklines\else%
+       \lst@ifcountblanklines\else%
+         \advance\c@lstnumber-\@ne\relax%
+       \fi%
+    \fi}
+\makeatother
+
+\lstnewenvironment{gobra}[1][]{
+  \lstset{
+    language=gobra,
+    floatplacement={tbp},
+    captionpos=b,
+    frame=lines,
+    numbers=left,
+    numberblanklines=false,
+    xleftmargin=8pt,
+    xrightmargin=8pt,
+    countblanklines=false,
+    numberstyle=\scriptsize,
+    #1
+  }
+}{}
+
+
+\lstnewenvironment{myViper}[1][]{
+  \lstset{
+    language=myViper,
+    floatplacement={tbp},
+    captionpos=b,
+    frame=lines,
+    numbers=left,
+    numberblanklines=false,
+    xleftmargin=8pt,
+    xrightmargin=8pt,
+    #1
+  }
+}{}
+
+%% Use similar to \lstinline itself, e.g \gobra!x := a.f!, i.e. with a
+%% surrounding delimiter.
+%% http://tex.stackexchange.com/questions/100427/
+\newcommand*{\inlgobra}{%
+  \lstinline[%
+    language=gobra,%
+    columns=fixed,%
+    basicstyle={\GobraFont\InlineGobraFontSize},%
+    mathescape=true,%
+    commentstyle={\color{black}\InlineGobraFontSize},
+    keywordstyle={[1]\color{black}\InlineGobraFontSize},
+    keywordstyle={[2]\color{black}\InlineGobraFontSize},
+    keywordstyle={[3]\color{black}\InlineGobraFontSize},
+    keywordstyle={[4]\color{black}\InlineGobraFontSize}
+  ]%
+}
+\newcommand*{\gl}{\inlgobra}
+
+\newcommand*{\inlmyviper}{%
+  \lstinline[%
+    language=myViper,%
+    columns=fixed,%
+    basicstyle={\GobraFont\InlineGobraFontSize},%
+    commentstyle={\color{black}\InlineGobraFontSize},
+    keywordstyle={[1]\color{black}\InlineGobraFontSize},
+    keywordstyle={[2]\color{black}\InlineGobraFontSize},
+    keywordstyle={[3]\color{black}\InlineGobraFontSize},
+    keywordstyle={[4]\color{black}\InlineGobraFontSize}
+  ]%
+}
+\newcommand*{\vl}{\inlmyviper}
+
+%% Ensure that \texttt and \inlgobra use the same font in the same size.
+%% Important, because it is sometimes seemingly impossible to use \inlgobra 
+%% (in general, verbatim text) in certain situations, in which case one can
+%% fallback to \texttt.
+\usepackage{letltxmacro} %% Provides \LetLtxMacro
+\LetLtxMacro\oldttfamily\ttfamily
+\DeclareRobustCommand{\ttfamily}{\oldttfamily\InlineGobraFontSize}
+
+%% ****************************************************************************
+
+% Encoding
+
+\newcommand{\encodeT}[1]{\llbracket #1 \rrbracket}
+\newcommand{\shared}[0]{@}
+\newcommand{\exclusive}[0]{\bullet}
+\newcommand{\encAs}[0]{\triangleq}
+
+\newcommand{\implementationProof}{_{\textsc{Proof}}}

@@ -1,0 +1,91 @@
+%
+% SILVER syntax highlighting for the LaTeX listings package
+%
+
+\RequirePackage{listings}
+\RequirePackage{microtype}
+\RequirePackage{xcolor}
+
+\newcommand\SilverSmall{\fontsize{8.3}{8.5}\selectfont}
+%\newcommand*\SilverFont{\SilverSmall\ttfamily\SetTracking{encoding=*}{-60}\lsstyle}
+%\newcommand*\SilverFont{\SilverSmall\ttfamily\lsstyle}
+\newcommand*\SilverFont{\small\ttfamily\lsstyle}
+
+\definecolor{darkgreen}{rgb}{0,0.3,0}
+\lstdefinelanguage{silver}{
+    morekeywords={
+        result,
+        Int, Perm, Bool, Ref,
+        true, false,
+        null,
+        method, function, predicate, domain, axiom, var, returns,
+        requires, ensures, invariant,
+        fold, unfold, inhale, exhale, new, assert, assume, goto,
+        while, if, elsif, else,
+        fresh,
+        unfolding, in,
+        old,
+        forall, exists, forperm,
+        acc, wildcard, write, none, epsilon, perm,
+        Seq, Set, MultiSet, union, intersection, setminus, subset,
+        unique,
+        field,
+        define,
+        package,
+        apply,
+        label
+    },
+%    literate=%
+%      {&&}{$\ast$}3
+%      {and}{\&\&}3
+%      {\\}{/}2
+%    ,
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    morestring=[b]",
+    numbers=none,
+    firstnumber=0,
+    numberstyle=\tiny,
+    stepnumber=5,
+    basicstyle={\SilverFont},
+    commentstyle={\SilverFont},
+    keepspaces=true,
+    keywordstyle=\bfseries,
+    ndkeywordstyle=\bfseries,
+    escapechar=@,
+    mathescape=true,
+    commentstyle=\color{darkgreen}\small\ttfamily
+}
+\lstnewenvironment{viper}[1][]{%
+    \lstset{language=silver,
+        floatplacement={tbp},captionpos=b,
+        frame=lines,xleftmargin=3pt,xrightmargin=3pt,#1}}{}
+\lstnewenvironment{viper2}[1][]{%
+	\lstset{language=silver,
+		floatplacement={tbp},captionpos=b,
+        frame=none,xleftmargin=3pt,xrightmargin=3pt,#1}}{}
+\lstnewenvironment{viper2linenum}[1][]{%
+    \lstset{language=silver,
+        floatplacement={tbp},captionpos=b,
+        frame=none,xleftmargin=3pt,xrightmargin=3pt,#1,
+        numbers=left,
+        numberstyle={},
+        firstnumber=1,
+        stepnumber=1}}{}
+    
+\newcommand{\silverfile}[1]{
+  \lstinputlisting[language=silver,%
+    frame=lines,xleftmargin=8pt,xrightmargin=8pt,columns=fixed]{#1}
+}
+
+\def\inlinesilver{%
+    \lstinline[language=silver,basicstyle=\ttfamily\small,columns=fixed]}
+
+%%% http://tex.stackexchange.com/questions/100427/
+%\newcommand\inlinesilver[1]{%
+%    \lstinline[language=silver,basicstyle=\ttfamily\small,columns=fixed]}
+
+%\newcommand*{\code}[1]{{\small\texttt{#1}}}
+\def\vipercode#1{\inlinesilver|#1|}
+%\let\code\inlinesilver

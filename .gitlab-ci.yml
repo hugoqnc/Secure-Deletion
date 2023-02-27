@@ -1,0 +1,14 @@
+image: vakaras/texlive:2021-06-28
+
+build:
+  script:
+    - cd description
+    - make
+    - cd ..
+    - cd report
+    - make
+    - cd ..
+  artifacts:
+    paths:
+      - "description/description.pdf"
+      - "report/thesis.pdf"
