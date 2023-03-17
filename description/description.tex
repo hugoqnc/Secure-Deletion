@@ -7,6 +7,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
 \usepackage[a4paper,width=150mm,top=25mm,bottom=25mm]{geometry}
+\usepackage[dvipsnames]{xcolor}
 
 \input{macros}
 
@@ -17,13 +18,13 @@
 \newcommand{\TODO}[1]{\textcolor{RedViolet}{\textbf{TODO:} #1}}
 
 % Title.
-\title{Title of Thesis \\
+\title{Secure Deletion of Sensitive Data in Protocol Implementations\\
 {\large Master Thesis Project Description}}
 
-\author{Max Mustermann \\ \\ Supervisors: Linard Arquint, Felix Wolf, Prof. Dr. Peter Müller \\
+\author{Hugo Queinnec \\ \\ Supervisors: Linard Arquint, Prof. Dr. Peter Müller \\
 Department of Computer Science, ETH Zurich}
-\date{Start: 23rd Feburary 2021 \\
-      End: 23rd August 2021}
+\date{Start: 13th March 2023 \\
+      End: 13th September 2023}
 
 
 \begin{document}
@@ -34,49 +35,148 @@ Department of Computer Science, ETH Zurich}
 \thispagestyle{plain}
 \pagestyle{plain}
 
-This place holder texts just shows how you can use the Gobra and Viper listings.
-For example, Listing~\ref{lst:echoServer}
-shows a Python class while Listing~\ref{lst:silver_fields} shows a
-method in the Viper~\cite{viper} language. For smaller code fragments,
-use this \gl+f(a,b)+. 
 
-\begin{figure}
+\section{Introduction}
+
+Today, cryptographic security protocols are widely used for communication. Applications include web browsing, online banking or text messaging. These protocols are used in order to authenticate participants, and to ensure that the communication is confidential and not tampered with.
+
+It is therefore crucial for these protocols to be secure. Two aspects of the protocol must be considered: the high-level protocol itself (that we will call \textit{model}), and its implementation.
+
+Guaranteeing the security of the protocol model through formal verification has been a well-studied problem. However, a verified protocol model is not enough to prevent security vulnerabilities that may come from the implementation. Such vulnerabilities can be due to simple programming errors, but also to more difficult cases that would occur only after a certain ordering of multiple distributed protocol operations.
+
+We will first introduce some existing approaches aiming at solving this problem.
+
+\section{Background}
+\subsection{DY*}
+
+The goal of DY* ~\cite{bhargavan2021text} is to symbolically verify protocol implementations. It uses the F* language to write protocol code that can be executed and verified. This way, a verified reference implementation is readily obtained.
+
+In addition to being able to verify low-level implementation properties, it uses a \textit{global trace} to model the global execution state of the protocol.
+When a protocol participant is taking a protocol step, it first reads its state from the trace, performs the step and then saves its new state (serialized) to the trace. This trace is append-only and existing entries cannot be modified or deleted. In addition to state changes, the trace records nonce generation, sent and received messages and corruption. The latter comes from a Dolev-Yao~\cite{dolev1983security} adversary present among participants, that can take arbitrary protocol steps at any time, and that may corrupt participants. Ultimately, this global trace contains the entire history of the protocol execution together with the exhaustive content of each participant state at any time.
+This explicit global trace is very useful for expressing global security properties, such as authentication properties, that could not be specified with a local implementation-level view.
+
+On the global trace, the state of a participant data is annotated with a \textit{session} and a \textit{version} (the full annotation is called \textit{session state identifier}, and section \ref*{sec:existing-approach-dy} will explain the \textit{version} more in detail). 
+Additionally, each variable is given a secrecy label, which can be (for example) a list of session state identifiers.
+This gives a partitioning of the data that allows us to reason about the consequences of what happens if the attacker corrupts a participant's session version. This can be used to verify security properties involving the attacker, such as forward secrecy and post-compromise security (explained section \ref*{sec:motivation}).
+
+Another big part of DY* is modularity. The framework is composed of a parametric library of independent modules which can be adapted and reused for various protocols. This also allows verifying modules independently, which reduces verification time.
+
+\subsection{Modular verification of existing implementations}
+
+The DY* framework is limited to verifying the implementation of protocols written in the F* language. However, there are many existing protocol implementations written in various languages that would benefit from verification. The methodology from Arquint et al.~\cite{arquint2022generic} aims at verifying protocol implementations at the implementation level together with global security properties, and independently of the implementation language. In the following, we will focus on the case of Go implementations with the Gobra~\cite{wolf2021gobra} verifier, but the methodology can be applied to other languages and verifiers.
+
+The methodology is inspired by the DY* framework, and also uses a global trace to model the global execution state of the protocol. A major difference is that the trace does not contain the entire state of each participant, but only a sequence of events corresponding to high-level operations (such as nonce creation or message sending) that will be used to prove global security properties. But the remaining state variables are distributed among participants, only having a partial local view of the protocol execution. 
+
+Verification is based on separation-logic, which allows us to reason about uniqueness (non-duplicable facts). Building on this, we can express strong security properties such as injective agreement, that an implementation satisfies if it detects if the attacker replays a message. This was not possible with DY*.
+
+For the verification of Go implementations, and similarly to DY*, this work comes with a parametric and reusable Go library providing higher-level methods in order to handle the global trace. It also takes advantage of modularity and provides protocol-independent properties that are already verified and which can be reused for different protocols.
+
+\section{Secure deletion of data}
+\subsection{Motivation}
+\label{sec:motivation}
+
+In some protocols, it is necessary to frequently delete sensitive data (such a session keys) in order to ensure some strong properties like forward secrecy and post-compromise security. This is notably the case in the Double-Ratchet Protocol~\cite{perrin2016double} that is a major component of the Signal protocol~\cite{marlinspike2016x3dh}. 
+
+This protocol is designed to be secure against an attacker that would record all previous encrypted messages, and that would obtain a shared secret at some time. The shared secret is renewed frequently using Diffie-Hellman Ratchet, and session keys are then derived from this secret to encrypt messages with their individual key. If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he recorded previously. This is why it is crucial for Alice to delete all previous secrets and session keys as soon as she has used them to encrypt or decrypt a message.
+Indeed, if previous keys are correctly deleted from Alice's memory, then the attacker may only be able to decrypt the last message(s), and not all previous ones. This is called forward secrecy.
+
+Moreover, this protocol gives the guarantee that if the attacker manages to compromise a (sufficiently old) past state of Alice, then he will not be able to corrupt Alice's current and future sessions. The protocol is \textit{self-reparable}, which is called post-compromise security. In order to achieve this property, we must ensure that no key (or derivations of these keys that the attacker can obtain) in this past state can be used for current and future communication. This requisite is not directly linked to data deletion, but it uses the same aspect of temporality stating that keys should only be valid for a limited time. This is the high-level aspect that is used in the DY* implementation, and that we would like to introduce to our Go verification library.
+
+\subsection{Existing approach in DY*}
+\label{sec:existing-approach-dy}
+
+The DY* framework already supports forward secrecy and post-compromise security properties, which means that it supports the deletion of old data and has a sense of temporality.
+This brings us back to the \textit{version} label, that is used to indicate temporality in the protocol. Initially, all versions are 0, and may then be incremented at some times to represent new protocol phases. 
+If a variable has for secrecy label a list of session state identifiers, all with version 0, then when the protocol moves to the next step, represented by version 1, this variable cannot be accessed anymore and is therefore deleted. In practice, this variable is not included in the following serialized state on the global trace, which \textit{automatically} handles the deletion process. This is the way DY* supports the forward secrecy property.
+
+With the approach of Arquint et al., there is no more global trace containing the entire state of each participant. We cannot iterate over the entire state to check if a variable is still valid or not, which requires a new approach to handle memory deletion.
+
+
+\subsection{Challenges of a new approach}
+
+The goal of this master thesis would be to be able to extend the work of Arquint et al. to support the deletion of old data. This would give us a language-agnostic methodology that could be applied to more complicated protocol implementations, such as implementations of Signal and the Double-Ratchet Protocol. By verifying data deletion, we could therefore prove that they satisfy forward secrecy and post-compromise security properties.
+
+Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}. Currently, this predicate is meant to verify that the participant gets the permission to each byte of the array and then returns it. This simple memory predicate looks like figure \ref{lst:mem}.
+
+\begin{figure}[h]
   \begin{gobra}
-    class Server(Thread):
-      def run():
-        server_socket = create_server_socket()
-        while True:
-          client_socket = server_socket.accept()
-          data = client_socket.read_all(timeout=1)
-          if data:
-            print(client_socket.address)
-            client_socket.send(data)
-          client_socket.close()
+      pred Mem(s ByteString) {
+            forall i int :: 0 <= i && i < len(s) ==> acc(&s[i])
+      }
   \end{gobra}
-  \caption{Echo server.}
-  \label{lst:echoServer}
+  \caption{Current memory predicate in the Go reusable verification library.}
+  \label{lst:mem}
 \end{figure}
 
-\begin{figure}
-    \begin{myViper}
-      field f: Int
-      field g: Int
-      method get_f(arg: Ref) returns (res1: Int,
-                                      res2: Int)
-        requires acc(arg.f)
-        ensures acc(arg.f) && res1 == arg.f
-      {
-        res1 := arg.f
-      //res2 := arg.g   // Verification error: might
-                        // not have permission to
-                        // access arg.g.
-      }
-    \end{myViper}
-    \caption{A simple getter method. The assignment to the result
-        variable \vl+res2+ fails to verify because the method does
-        not have a permission to access field \vl+arg.g+.}
-    \label{lst:silver_fields}
-\end{figure}
+For this thesis, an approach to add a notion of temporality could be to introduce a new memory predicate that would be used specifically for variables that need to be deleted at some time. Thinking about how to design such a predicate will be a first challenge of this thesis, but one could imagine using a \textit{version} parameter for the new \texttt{Mem} predicate to represent temporality, quite similarly as in DY*.
+
+However, the main challenge of this thesis will be to ensure that variables are actually deleted from memory as specified by the memory predicate. If we use \textit{version}, it would mean to ensure that variables with a version \texttt{v} are deleted from memory when the protocol moves to version \texttt{v+1}. Viper~\cite{muller2016viper} provides some primitives  which will be the basis of our deletion mechanism. In order to achieve our final goal of supporting properties like forward secrecy in the reusable verification library, it will require to implement a lot of abstractions and higher-level APIs, to support the deletion mechanism first at the level of the Gobra verifier, and then at the level of the library.
+
+A way to proceed could be to implement an obligation mechanism in Gobra, encoded on top of Viper's \texttt{forperm} quantifier. The goal would be to obtain a delete function, that would be the only way to discharge obligations coming from the memory predicates. By doing so, we could have an invariant checking that all sensible variables have the same version number as a global version variable representing the protocol phase. Therefore, we could only move on to the next phase and increment the global version variable when all sensitive variables had been removed (which means that their obligations should have been discharged with the delete function).
+
+\section{Core Goals}
+
+\begin{itemize}
+      \item \textbf{Methodology.} Present a methodology that would extend Arquint's and al. work on protocol implementation verification, and that would allow to verify the deletion of old data in a protocol implementation. This methodology would ultimately allow the verification of high-level security properties relying on data deletion, such as forward secrecy.
+      \item \textbf{Extension of Gobra.} Extend the Gobra verifier to support the deletion of old data, based on existing Viper's primitives. Support will be limited to particular functions that will be useful for implementing the verification library extension in the next step. This may come down to implementing an obligation discharge mechanism, that would then be used to discharge obligations coming from the new memory predicates.
+      \item \textbf{Extension of the Go Reusable Verification Library.} Extend the reusable verification library to support the deletion of old data, based on the new functionalities added to the Gobra verifier at the previous step. The library will then provide higher-level APIs to handle the deletion mechanism, that will be useful for protocol implementation verification.
+      \item \textbf{Implementation of an example protocol.} Using the previously extended verification library, implement and verify a small protocol relying on frequent deletion of sensitive data. Verifying a high-level property such as forward secrecy will showcase the potential of the methodology.
+      \item \textbf{Evaluation.} Evaluate the newly developed methodology and associated implementations. Discuss its potential and its limitations, and see how it compares to existing approaches, such as DY*.
+\end{itemize}
+
+\section{Extension Goals}
+
+\begin{itemize}
+      \item \textbf{Case study on a solution using a linear type system.} The Gobra verifier may benefit from a linear type system in the future. Investigate what a solution to our initial problem might look like if we take advantage of the possibilities offered by a linear type system.
+      \item \textbf{Verification of an existing protocol.} Find an existing protocol that uses memory deletion in order to obtain security properties such as forward secrecy and post-compromise security. Find an implementation of this protocol in Go, if possible an official implementation, and verify it using the developed methodology and extended verification library.
+      \item \textbf{Case study on the use of our Gobra extensions.} Look if the extensions added to the Gobra verifier could have a use outside our specific use for protocol implementation verification. If so, it may be interesting to further develop Gobra extensions to provide better support to these newly found use cases.
+\end{itemize}
+
+
+
+% This place holder texts just shows how you can use the Gobra and Viper listings.
+% For example, Listing~\ref{lst:echoServer}
+% shows a Python class while Listing~\ref{lst:silver_fields} shows a
+% method in the Viper~\cite{viper} language. For smaller code fragments,
+% use this \gl+f(a,b)+. 
+
+% \begin{figure}
+%   \begin{gobra}
+%     class Server(Thread):
+%       def run():
+%         server_socket = create_server_socket()
+%         while True:
+%           client_socket = server_socket.accept()
+%           data = client_socket.read_all(timeout=1)
+%           if data:
+%             print(client_socket.address)
+%             client_socket.send(data)
+%           client_socket.close()
+%   \end{gobra}
+%   \caption{Echo server.}
+%   \label{lst:echoServer}
+% \end{figure}
+
+% \begin{figure}
+%     \begin{myViper}
+%       field f: Int
+%       field g: Int
+%       method get_f(arg: Ref) returns (res1: Int,
+%                                       res2: Int)
+%         requires acc(arg.f)
+%         ensures acc(arg.f) && res1 == arg.f
+%       {
+%         res1 := arg.f
+%       //res2 := arg.g   // Verification error: might
+%                         // not have permission to
+%                         // access arg.g.
+%       }
+%     \end{myViper}
+%     \caption{A simple getter method. The assignment to the result
+%         variable \vl+res2+ fails to verify because the method does
+%         not have a permission to access field \vl+arg.g+.}
+%     \label{lst:silver_fields}
+% \end{figure}
 
 % References should be produced using the bibtex program from suitable
 % BiBTeX files (here: bibl_conf). The IEEEbib.bst bibliography

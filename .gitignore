@@ -1,0 +1,6 @@
+.DS_Store
+.vscode
+tmp
+*.fls
+*.fdb_latexmk
+*.synctex.gz
