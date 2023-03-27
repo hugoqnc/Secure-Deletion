@@ -23,8 +23,8 @@
 
 \author{Hugo Queinnec \\ \\ Supervisors: Linard Arquint, Prof. Dr. Peter Müller \\
 Department of Computer Science, ETH Zurich}
-\date{Start: 13th March 2023 \\
-      End: 13th September 2023 \\
+\date{Start: 27th March 2023 \\
+      End: 27th September 2023 \\
       \TODO{Update the dates in the final version.}}
 
 
@@ -46,18 +46,23 @@ Department of Computer Science, ETH Zurich}
 % 5. While [authors + citation] propose a promising methodology for verifying security properties for protocol implementations, they cannot reason about sensitive data that must be deleted in a timely manner. This is crucial for proving strong security properties such as post-compromise security.
 
 Security protocols are omnipresent in our daily lives, they are the foundation for many applications ranging from online banking to text messaging. These protocols employ cryptography to achieve fundamental security properties such as authentication and confidentiality.
-Online banking operations serve as a prime example of how heavily we rely on security protocols. A breach in the security of these protocols could lead to substantial financial losses, which is why it is essential that these protocols are both correct and secure. For example, proving a property such as \textit{injective agreement} \TODO{footnote} protects against replay attacks and prevent a transaction to be repeated multiple times.
+Online banking operations serve as a prime example of how heavily we rely on security protocols. A breach in the security of these protocols could lead to substantial financial losses, which is why it is essential that these protocols are both correct and secure. For example, proving a property such as \textit{injective agreement} protects against replay attacks and prevents a transaction to be repeated multiple times.
 
-Guaranteeing security properties of protocols is a challenging task, especially when in the presence of a strong attacker (developed section \TODO{add}). In order to ensure these properties for any protocol execution, the verification process must consider an arbitrary number of participants and protocol sessions, as well as any possible ordering of protocol events. Furthermore, protocol security properties are generally not local to a particular participant but global, such as mutual authentication between two parties. This presents an additional challenge for verification as it requires a global view of the protocol execution — which is typically not present in the original protocol design.
+Guaranteeing security properties of protocols is a challenging task, especially when in the presence of a strong attacker (developed section \ref*{sec:symbolic-analysis}). In order to ensure these properties for any protocol execution, the verification process must consider an arbitrary number of participants and protocol sessions, as well as any possible ordering of protocol events. Furthermore, protocol security properties are generally not local to a particular participant but global, such as mutual authentication between two parties. This presents an additional challenge for verification as it requires a global view of the protocol execution — which is typically not present in the original protocol design.
 
-When reasoning about correctness, two aspects of the protocol must be considered: the high-level protocol itself (that we will call \textit{model}), and its implementation. Proving security properties for a protocol model is an active field of research and several promising automatic verifiers have been proposed (like Tamarin and ProVerif \TODO{cite}). However, a verified protocol model does not imply that an implementation is free of security vulnerabilities and achieves the same security properties as its model. This is why we would like to focus on verifying security properties for protocol implementations.
+When reasoning about correctness, two aspects of the protocol must be considered: the high-level protocol itself (that we will call \textit{model}), and its implementation. Proving security properties for a protocol model is an active field of research and several promising automatic verifiers have been proposed (like Tamarin \cite{meier2013tamarin} and ProVerif \cite{blanchet2016modeling}). However, a verified protocol model does not imply that an implementation is free of security vulnerabilities and achieves the same security properties as its model. This is why we would like to focus on verifying security properties for protocol implementations.
 
-While Arquint and al.\cite{arquint2022generic} propose a promising methodology for verifying security properties for protocol implementations, they cannot reason about sensitive data that must be deleted in a timely manner. This is a limitation for some protocols, like Signal\cite{marlinspike2016x3dh}, which frequently renew keys in order to achieve strong security properties such as ...
-\TODO{Find an answer to my questions sent to Linard + use arguments from \ref*{sec:motivation}}
+While Arquint and al.\cite{arquint2022generic} propose a promising methodology for verifying security properties for protocol implementations, they cannot reason about sensitive data that must be deleted in a timely manner. This is a limitation for some protocols, like Signal\cite{marlinspike2016x3dh}, which frequently renew keys in order to achieve strong security properties such as forward secrecy and post-compromise security. 
+Forward secrecy guarantees that an attacker cannot compute the session keys of an already established session after learning the long-term secret keys. It is crucial for secure communication, as it ensures that an attacker cannot decrypt past messages even if they manage to compromise the long-term secret keys.
+Post-compromise security informally means that a participant can communicate securely with a peer, even if the peer’s secrets have already been (partly) compromised \cite{7536374}.
+This can be referred to as \textit{healing}, which allows a communication to resume securely at some point after a compromise.
+
+Protocols like Signal achieve both of these properties by using a key rotation scheme within a session, where a communication key is used to generate a successor and then deleted. The goal of this thesis would be to be able to prove that such sensitive data has been securely deleted, which would allow us to prove forward secrecy and post-compromise security properties.
 
 \section{Background}
 
 \subsection{Symbolic Protocol Analysis}
+\label{sec:symbolic-analysis}
 % Develop symbolic analysis, attacker model and global trace
 
 This research work is a continuation of the study of symbolic methods for protocol analysis. In this model, we are abstracting concrete bit-strings to algebraic \textit{terms} which encode the program semantic and can be used to express properties encoded as logical expressions.
@@ -79,7 +84,7 @@ When a protocol participant is taking a protocol step, it first reads its serial
 Ultimately, this global trace contains each participant's current and all past states, and provides a global view over the entire distributed system such that global properties can be expressed and proven.
 
 On the global trace, each state of a participant is grouped into \textit{sessions}, modeling the fact that a participant may be involved in multiple independent protocol sessions at the same time.
-Each session is additionally annotated with a \textit{version}\footnote{Explained in detail section \ref*{sec:existing-approach-dy}.}. The full annotation is called a \textit{session state identifier}.
+Each session is additionally annotated with a \textit{version} (explained in detail section \ref*{sec:existing-approach-dy}). The full annotation is called a \textit{session state identifier}.
 Each value in a participant's state is given a secrecy label, expressing which participants are allowed to read this value. This means that an attacker corrupting some participant (or in a more fine-grained way, one of its sessions, possibly with a specific version) can read all values having this session state identifier as a secrecy label.
 
 DY* achieves modular reasoning by specifying a trace invariant and verifying that each function modifies the global trace only in ways that maintain the trace invariant. This modular approach reduces the overall verification time.
@@ -99,34 +104,51 @@ Verification is based on separation-logic, which allows us to reason about heap 
 Similarly to DY*, this methodology comes with a library that allows to reuse protocol-independent parts (verified only once) across different protocol implementations.
 
 \section{Secure deletion of data}
-% Existing approach in DY* - Challenges of a new approach
+% General idea - Existing approaches - Challenges of a new approach
+
+\subsection{Achievable security properties}
+
+As mentioned initially, some protocols achieve strong security properties by frequently renewing their keys within the same protocol session. This is notably the case in the Double-Ratchet Protocol \cite{perrin2016double} which is a major component of the Signal protocol.
+%The notion of “key-renewal” involves two steps, key generation and key deletion, that are equally important in order to prove our security properties.
+
+Forward secrecy is enabled by two main factors: cryptographically preventing past communication keys from being derived only from the long-term secret and current communication keys, and securely deleting previous keys.
+The Double-Ratchet protocol is designed to be secure against an attacker recording all previous encrypted messages and obtaining a shared secret at some point. In a protocol session, the shared secret is renewed frequently using Diffie-Hellman Ratchet, and communication keys are then derived from this secret to encrypt messages with their individual key. If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he recorded previously. This is why it is crucial for Alice to delete all previous secrets and session keys as soon as she has used them to encrypt or decrypt a message.
+Indeed, if previous keys are correctly deleted from Alice's memory, then the attacker may only be able to decrypt the last message(s), and not all previous ones.
 
 
-\subsection{Motivation}
-\label{sec:motivation}
+Post-compromise security (PCS), as defined earlier, is not achievable after the \textit{unrestricted} compromise of the peer participant: the initiator would have no guarantee to be in communication with the intended peer because the attacker could act exactly like him.
+We look instead to the formalized notion of post-compromise \textit{via state} \cite{7536374}: a participant can communicate securely with a peer during a session, even if the adversary compromises all but one exchange of messages before this session.
+To be able to prove this property, we must ensure that for example, a single old state does not contain some future session keys. Otherwise, corrupting this single state would allow the attacker to decrypt all future messages encrypted with those keys (violating post-compromise via state). Though this is not directly related to memory deletion, it shows why it is crucial to have session keys existing only during some lapse of time.
 
-\TODO{Modify this part to account that most of the content is already in the introduction}
+Enabling our verification methodology to proves these two strong security properties will therefore require to introduce a notion of temporality, to specify the lapses of time during which keys are available. Outside these lapses, keys should not be present in memory, but either not-yet-generated or deleted.
 
-In some protocols, it is necessary to frequently delete sensitive data (such a session keys) in order to ensure some strong properties like forward secrecy and post-compromise security. This is notably the case in the Double-Ratchet Protocol~\cite{perrin2016double} that is a major component of the Signal protocol~\cite{marlinspike2016x3dh}. 
+% \subsection{Motivation}
 
-This protocol is designed to be secure against an attacker that would record all previous encrypted messages, and that would obtain a shared secret at some time. The shared secret is renewed frequently using Diffie-Hellman Ratchet, and session keys are then derived from this secret to encrypt messages with their individual key. If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he recorded previously. This is why it is crucial for Alice to delete all previous secrets and session keys as soon as she has used them to encrypt or decrypt a message.
-Indeed, if previous keys are correctly deleted from Alice's memory, then the attacker may only be able to decrypt the last message(s), and not all previous ones. This is called forward secrecy.
+% \TODO{Modify this part to account that most of the content is already in the introduction}
 
-Moreover, this protocol gives the guarantee that if the attacker manages to compromise a (sufficiently old) past state of Alice, then he will not be able to corrupt Alice's current and future sessions. The protocol is \textit{self-reparable}, which is called post-compromise security. In order to achieve this property, we must ensure that no key (or derivations of these keys that the attacker can obtain) in this past state can be used for current and future communication. This requisite is not directly linked to data deletion, but it uses the same aspect of temporality stating that keys should only be valid for a limited time. This is the high-level aspect that is used in the DY* implementation, and that we would like to introduce to our Go verification library.
+% In some protocols, it is necessary to frequently delete sensitive data (such a session keys) in order to ensure some strong properties like forward secrecy and post-compromise security. This is notably the case in the Double-Ratchet Protocol~\cite{perrin2016double} that is a major component of the Signal protocol~\cite{marlinspike2016x3dh}. 
+
+% This protocol is designed to be secure against an attacker that would record all previous encrypted messages, and that would obtain a shared secret at some time. The shared secret is renewed frequently using Diffie-Hellman Ratchet, and session keys are then derived from this secret to encrypt messages with their individual key. If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he recorded previously. This is why it is crucial for Alice to delete all previous secrets and session keys as soon as she has used them to encrypt or decrypt a message.
+% Indeed, if previous keys are correctly deleted from Alice's memory, then the attacker may only be able to decrypt the last message(s), and not all previous ones. This is called forward secrecy.
+
+% Moreover, this protocol gives the guarantee that if the attacker manages to compromise a (sufficiently old) past state of Alice, then he will not be able to corrupt Alice's current and future sessions. The protocol is \textit{self-reparable}, which is called post-compromise security. In order to achieve this property, we must ensure that no key (or derivations of these keys that the attacker can obtain) in this past state can be used for current and future communication. This requisite is not directly linked to data deletion, but it uses the same aspect of temporality stating that keys should only be valid for a limited time. This is the high-level aspect that is used in the DY* implementation, and that we would like to introduce to our Go verification library.
 
 \subsection{Existing approach in DY*}
 \label{sec:existing-approach-dy}
 
-The DY* framework already supports forward secrecy and post-compromise security properties, which means that it supports the deletion of old data and has a sense of temporality.
-This brings us back to the \textit{version} label, that is used to indicate temporality in the protocol. Initially, all versions are 0, and may then be incremented at some times to represent new protocol phases. 
-If a variable has for secrecy label a list of session state identifiers, all with version 0, then when the protocol moves to the next step, represented by version 1, this variable cannot be accessed anymore and is therefore deleted. In practice, this variable is not included in the following serialized state on the global trace, which \textit{automatically} handles the deletion process. This is the way DY* supports the forward secrecy property.
+The DY* framework already supports forward secrecy and post-compromise security properties. Indeed, it supports the deletion of old data and has a sense of temporality.
+The latter brings us back to the \textit{version} label, that is used to indicate temporality in a protocol session. Initially, all versions are 0, and may then be incremented at some times to represent new protocol phases. 
+If some value in a participant's state has for secrecy label a session state identifier indicating some session with version 0, then when this session of the protocol moves to the next step, represented by version 1, this value cannot be accessed anymore and is therefore deleted.
+In practice, this variable is not included in the following serialized state on the global trace, which \textit{automatically} handles the deletion process. This is the way DY* supports the forward secrecy property.
+In the same way, a value having a secrecy label with a version higher than the current session version would cause a verification error. This allows DY* to verify post-compromise security.
 
-With the approach of Arquint et al., there is no more global trace containing the entire state of each participant. We cannot iterate over the entire state to check if a variable is still valid or not, which requires a new approach to handle memory deletion.
+With the approach of Arquint et al., participant's states are no longer serialized and stored on the global trace. It is therefore not possible to use the exact same approach, and memory deletion needs to be handled explicitly.
 
 
 \subsection{Challenges of a new approach}
 
-The goal of this master thesis would be to be able to extend the work of Arquint et al. to support the deletion of old data. This would give us a language-agnostic methodology that could be applied to more complicated protocol implementations, such as implementations of Signal and the Double-Ratchet Protocol. By verifying data deletion, we could therefore prove that they satisfy forward secrecy and post-compromise security properties.
+The aim of this master's thesis is to build on the work of Arquint et al. to introduce a notion of temporality and an explicit deletion mechanism for sensitive data.
+This would result in a language-agnostic methodology that could be applied to more complicated protocol implementations, such as implementations of Signal and the Double-Ratchet Protocol. By verifying data deletion, we could therefore prove that they satisfy forward secrecy and post-compromise security properties.
 
 Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}. Currently, this predicate is meant to verify that the participant gets the permission to each byte of the array and then returns it. This simple memory predicate looks like figure \ref{lst:mem}.
 
@@ -140,11 +162,11 @@ Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.
   \label{lst:mem}
 \end{figure}
 
-For this thesis, an approach to add a notion of temporality could be to introduce a new memory predicate that would be used specifically for variables that need to be deleted at some time. Thinking about how to design such a predicate will be a first challenge of this thesis, but one could imagine using a \textit{version} parameter for the new \texttt{Mem} predicate to represent temporality, quite similarly as in DY*.
+For this thesis, an approach to add a notion of temporality could be to introduce a new memory predicate that would be used specifically for values that need to be deleted at some point. Thinking about how to design such a predicate will be a first challenge of this thesis, but one could imagine using a \textit{version} parameter for the new \texttt{Mem} predicate to represent temporality, quite similarly as in DY*.
 
-However, the main challenge of this thesis will be to ensure that variables are actually deleted from memory as specified by the memory predicate. If we use \textit{version}, it would mean to ensure that variables with a version \texttt{v} are deleted from memory when the protocol moves to version \texttt{v+1}. Viper~\cite{muller2016viper} provides some primitives  which will be the basis of our deletion mechanism. In order to achieve our final goal of supporting properties like forward secrecy in the reusable verification library, it will require to implement a lot of abstractions and higher-level APIs, to support the deletion mechanism first at the level of the Gobra verifier, and then at the level of the library.
+However, the main challenge of this thesis will be to ensure that variables are actually deleted from memory as specified by the memory predicate. If we use \textit{version}, it would mean to ensure that variables with a version \texttt{v} are deleted from memory when the protocol moves to version \texttt{v+1}. Viper~\cite{muller2016viper} provides some primitives  which will be the basis of our deletion mechanism. In order to achieve our final goal of supporting properties like forward secrecy in the reusable verification library, it will require implementing abstractions and higher-level APIs to support the deletion mechanism first at the level of the Gobra verifier, and then at the level of the library.
 
-A way to proceed could be to implement an obligation mechanism in Gobra, encoded on top of Viper's \texttt{forperm} quantifier. The goal would be to obtain a delete function, that would be the only way to discharge obligations coming from the memory predicates. By doing so, we could have an invariant checking that all sensible variables have the same version number as a global version variable representing the protocol phase. Therefore, we could only move on to the next phase and increment the global version variable when all sensitive variables had been removed (which means that their obligations should have been discharged with the delete function).
+A way to proceed could be to implement an obligation mechanism in Gobra, encoded on top of Viper's \texttt{forperm} quantifier. The goal would be to obtain a delete function, that would be the only way to discharge obligations coming from the new memory predicate. By doing so, we could have an invariant checking that all sensible values have the same version number as a global version variable representing the protocol phase. Therefore, we could only move on to the next phase and increment the global version variable if all sensitive variables had been removed (which means that their obligations should have been discharged with the delete function).
 
 \section{Core Goals}
 
