@@ -69,19 +69,23 @@ Protocols like Signal achieve both of these properties by using a key rotation s
 \subsection{Symbolic Protocol Analysis}
 \label{sec:symbolic-analysis}
 
-This research work is a continuation of the study of symbolic methods for protocol analysis. In this model, we are abstracting concrete bit-strings to algebraic \emph{terms}, which can be used to express properties written as logical expressions.
-In particular, we use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key. We also assume that all operations are performed on symbolic terms rather than at the byte level.
+This research work is a continuation of the study of symbolic methods for protocol analysis.
+% In this model, we are abstracting concrete bit-strings to algebraic \emph{terms}.
+% , which can be used to express properties written as logical expressions.
+We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
+% We also assume that all operations are performed on symbolic terms rather than at the byte level.
+We assume that all operations are performed on symbolic \emph{terms} instead of bytes, which is why we abstract concrete bit-strings to terms.
 
 Furthermore, we consider a Dolev-Yao\cite{dolev1983security} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in the participant's state).
 
 A common procedure for modeling protocols in this setting is to consider a trace. This trace records the sequence of protocol events in a particular run of the protocol.
-Security properties can be expressed as a logical expression about traces, and then verified by checking whether it holds for all possible traces of the protocol.
+Security properties can be expressed as a logical expression about a trace, and then verified by checking whether it holds for all possible traces of the protocol.
 Automated provers like Tamarin and ProVerif can verify certain security properties for a protocol \emph{model} by analyzing all its possible traces.
 
-When considering the verification of protocol \emph{implementations}, traces can also be used. The overall idea is to extend the implementation with a trace structure that is used to record protocol operations. In order to reason about the whole protocol (and not a single execution), we define a \emph{trace invariant}. It is a property that every prefix of any trace of the protocol must satisfy.
+When considering the verification of protocol \emph{implementations}, traces can also be used. The overall idea is to extend the implementation with a trace data structure that is used to record protocol operations. In order to reason about the whole protocol (and not a single execution), we define a \emph{trace invariant}. It is a property that every prefix of any trace of the protocol must satisfy.
 Verifying the protocol implementation ultimately consists in proving that each action of a participant or the attacker maintains the trace invariant, and then proving that the invariant implies the intended security properties.
 
-In the following, we will introduce two existing approaches in this verification setting  aiming at verifying high-level security properties for protocol \emph{implementations}. These approaches are the main basis for our future work.
+In the following, we will introduce two existing approaches in this verification setting  aiming at verifying high-level security properties for protocol \emph{implementations}. These approaches are the main basis for our work.
 
 \subsection{DY*}
 
@@ -96,7 +100,8 @@ DY* achieves modular reasoning by specifying a trace invariant and verifying tha
 
 On the global trace, each state is annotated with a \emph{session state identifier} to indicate to which participant and protocol session it belongs. This models the fact that a participant may be involved in multiple independent protocol sessions simultaneously. The session state identifier includes a \emph{version} that distinguishes between different phases within a protocol session, as explained in detail in section \ref*{sec:existing-approach-dy}.
 
-Each participant's state comprises several values that together constitute the program state of the participant at that point in time. Each of these values is assigned a secrecy label, indicating which participants are allowed to read the value. In DY*, if an attacker corrupts a participant or one of its sessions (possibly with a specific version), they will obtain all values having the corrupted session state identifier as a secrecy label.
+Each participant's state comprises several values that together constitute the program state of the participant at that point in time. Each of these values is assigned a secrecy label, indicating which participants are allowed to read the value.
+% In DY*, if an attacker corrupts a participant or one of its sessions (possibly with a specific version), they will obtain all values having the corrupted session state identifier as a secrecy label.
 
 Protocol implementations written in F* and verified with DY* are executable, but require a special runtime environment that provides access to the trace. Additionally, the DY* framework is composed of a library, containing protocol-independent parts that only need to be verified once, and can then be reused across different protocols. This significantly reduces the overall verification time.
 
@@ -110,7 +115,7 @@ Arquint et al.\cite{arquint2022generic} present a methodology for verifying exis
 
 This methodology is inspired by DY* and also uses a global trace to provide a global view over the entire system.
 % Arbitrary code structure
-To address the issue of arbitrary code structure in existing implementations, the trace is treated as a concurrent data structure. It allows arbitrary interleaving of operations, in a more fine-grained manner than arbitrary interleaving of protocol steps in DY*.
+To address the issue of arbitrary code structure in existing implementations, the trace is treated as a concurrent data structure. It allows arbitrary interleavings of operations, in a more fine-grained manner than arbitrary interleavings of protocol steps in DY*, which is crucial for soundness in this setting.
 % Program state management
 As existing implementations manage program state in their unique ways, we cannot assume that they store the state on the trace or rewrite implementations to do so. Instead, \emph{local invariants} are used to relate program state stored at the local participant-level with the global trace invariant.
 The global trace only records a sequence of events corresponding to high-level operations (similar to DY*, except for the state storage entry) that must maintain a trace invariant, which is used to prove global security properties.
@@ -130,10 +135,10 @@ Similarly to DY*, this methodology comes with a library that allows to reuse pro
 As mentioned, some protocols achieve strong security properties by frequently renewing their keys within the same protocol session. This is notably the case in the Double-Ratchet Protocol \cite{perrin2016double}, which is a major component of the Signal protocol.
 
 A session of the Double-Ratchet protocol requires frequent renewal of a shared secret between two participants using the Diffie-Hellman ratchet.
-Then for every message, a \emph{communication key} is derived (from the current shared secret, using a key derivation function) and encrypts the message with its individual key.
+Then for every message, a \emph{communication key} is derived (from the current shared secret, using a key derivation function) and used to encrypt the message.
 % By executing the same computation steps, the participants can derive the same communication keys and decrypt received messages.
 The Double-Ratchet protocol is designed to be secure against an attacker recording all previous encrypted messages and obtaining a shared secret or a communication key at some point.
-If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he recorded previously. This is why it is crucial for Alice to delete previous secrets and communication keys as soon as she has derived the new ones.
+If the attacker compromises a participant, for example Alice, he may be able to decrypt some messages using the keys and secrets stored in Alice's memory. If Alice keeps storing all previous secrets and session keys, then the attacker would be able to decrypt all previous messages that he previously observed on the network. This is why it is crucial for Alice to delete previous secrets and communication keys as soon as she has derived the new ones.
 Indeed, if previous keys are correctly deleted from Alice's memory, then the attacker may only be able to decrypt the last message(s), and not all previous ones.
 
 Therefore, the Double-Ratchet protocol satisfies forward secrecy. This property is enabled by two main factors: cryptographically preventing past communication keys from being derived only from the long-term secret and current communication keys, and securely deleting previous keys.
@@ -148,25 +153,37 @@ To be able to prove this property, we must be able to prove that a certain state
 Although post-compromise security is not directly related to secure deletion, it requires a fine-grained reasoning about the data occurring in a participant's state at a particular point in time. As we will see in section \ref*{sec:our-approach}, the same mechanism as for forward secrecy can be applied.
 
 % Enabling our verification methodology to proves these two strong security properties will therefore require to introduce a notion of temporality, to specify the lapses of time during which keys are available. Outside these lapses, keys should not be present in memory, but either not-yet-generated or deleted.
-Our methodology to prove these two strong security properties requires a notion of temporality because we have to specify the lapses of time during which keys are available. Outside these lapses, keys should not be present in memory because they have either not been generated yet or have already been securely deleted.
+Our methodology to prove these two strong security properties requires a notion of temporality because we have to specify the lapses of time during which certain keys are available. Outside these lapses, keys must not be present in memory because they have either not been generated yet or have already been securely deleted.
 
 
 \subsection{Existing approach and its shortcomings}
 \label{sec:existing-approach-dy}
 % Introduce versions, then discuss the solution
 
-The DY* framework supports proving forward secrecy and post-compromise security.
+% The DY* framework supports proving forward secrecy and post-compromise security.
 % Indeed, it supports the deletion of old data and has a sense of temporality.
 
-It uses a \emph{version} label for each session, in order to indicate temporality. Initially, all versions are 0 and are incremented at some times to represent new protocol phases. Values with version \textit{x} can only occur in states within phase \textit{x} of the protocol. DY* enforces this restriction with a suitable invariant over states. Thus, only data of the current version is stored at anytime, ensuring that neither outdated keys nor future keys are present in memory. Building on this, they are able to prove forward secrecy and post-compromise security for protocols like Signal.
+DY* uses a \emph{version} label for each session, in order to indicate temporality. Initially, all versions are 0 and are incremented at some times to represent new protocol phases. Values with version \textit{x} can only occur in states within phase \textit{x} of the protocol. DY* enforces this restriction with a suitable invariant over states. Thus, only data of the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory. Building on this, they are able to prove forward secrecy and post-compromise security for protocols like Signal.
 
 However, DY* does not enforce that outdated keys are securely deleted from memory. They only show that they are not present in the current scope, but outdated keys are not explicitly zeroed out from memory.
 %  and may still be physically present.
-Moreover, this solution is not applicable to most existing implementations because their state is not stored on a trace, making it impossible to express such an invariant without making significant modifications to the implementations.
-Furthermore, the verification of the DY* trace invariant is limited to fixed time points, namely when the state is stored on the trace, without taking into account the state in-between. However, some existing implementations may necessitate a more precise granularity to analyze the state. For instance, there may be a brief moment during which both the old and new keys are in use and present in the memory.
+Moreover, this solution is not applicable to existing implementations because their state is not stored on a trace, making it impossible to express such an invariant.
+% without making significant modifications to the implementations.
+Furthermore, DY* enforces the invariant over state only at certain time points, namely when the state is stored on the trace, without taking into account the state in-between.
+% However, some existing implementations may necessitate a more precise granularity to analyze the state. For instance, there may be a brief moment during which both the old and new keys are in use and present in the memory.
 
-While the approach of Arquint et al. does not have such a versioning mechanism to indicate temporality, it is a better basis for our approach as we target existing implementations.
-Since participant states are not serialized and stored on the global trace, it is not possible to use the same approach as for DY* and memory deletion must be handled explicitly.
+% This and the next sentence are not fully clear. I'd argue as follows:
+% - methods in existing implementations might be long running (or even non-terminating)
+% - enforcing the invariant at the beginning and end is thus not sufficient or would otherwise result in a weird attacker model (i.e. we would implicitly assume that the attacker cannot access the program state most of the time (when the program is stuck in e.g. the infinite loop))
+% - we thus want an invariant that *always* holds over the local state instead of only at certain time points
+% - thus, we also must account for the case during generating the next key that *for a short period* we must allow keys of the current and next version / phase simultaneously be present in the state
+
+However, some existing implementations may contain long-running or non-terminating methods. It would not be sufficient to enforce the invariant only at the beginning and at the end of these methods, as this would result in an unrealistic attacker model where the attacker is assumed to not have access to the program state most of the time. Therefore, we want to have an invariant that always holds over the local state instead of only at certain times. 
+% Thus, we also must account for the case during generating the next key that for a \emph{short period} we must allow keys of the current and next version to simultaneously be present in the state.
+This invariant must be designed to account for the situation during key generation where keys of both current and next versions may coexist in the state for a \emph{short period}.
+
+% While the approach of Arquint et al. does not have such a versioning mechanism to indicate temporality, it is a better basis for our approach as we target existing implementations.
+% Since participant states are not serialized and stored on the global trace, it is not possible to use the same approach as for DY* and memory deletion must be handled explicitly.
 
 
 \subsection{Our approach}
@@ -175,7 +192,9 @@ Since participant states are not serialized and stored on the global trace, it i
 This thesis extends the methodology of Arquint et al. by introducing a notion of temporality and by enforcing secure deletion of sensitive data.
 We aim for a language-agnostic solution that can be applied to existing implementations performing key rotations, such as implementations of Signal and the Double-Ratchet Protocol. This extension will allow us to prove forward secrecy and post-compromise security for these protocol implementations.
 
-Our approach will use a mechanism similar to that of DY* \emph{versions} to indicate the lapses of time during which sensitive data should be present in memory. This mechanism will ensure that outdated sensitive data is safely deleted.
+Our approach will use a mechanism similar to that of DY* \emph{versions} to indicate the lapses of time during which sensitive data can be present in memory.
+% This mechanism will ensure that outdated sensitive data is safely deleted.
+However, we have to develop a modular verification technique to ensure that sensitive data is guaranteed to be absent in all other lapses of time.
 
 Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
 The \texttt{Mem} predicate is used to abstract over the memory of a byte array and thus specifies permissions to every byte in the array.
@@ -194,17 +213,17 @@ The predicate body is shown in figure~\ref{lst:mem} only for illustration purpos
 
 For this thesis, we add a notion of temporality via a separate memory predicate.
 Thinking about how to design such a predicate will be a first challenge of this thesis.
-One possible approach is a new memory predicate that marks all byte arrays that require secure deletion at the end of their lifetime and has an additional parameter specifying the byte array's \emph{version}.
+One possible approach is a new memory predicate that marks byte arrays that require secure deletion at the end of their lifetime and has an additional parameter specifying the byte array's \emph{version} (i.e. lifetime).
 % Thinking about how to design such a predicate will be a first challenge of this thesis, but one could imagine using a \emph{version} parameter for the new \texttt{Mem} predicate to represent temporality.
 
 However, we have to ensure that variables are actually deleted from memory as specified by the memory predicate. If we use \emph{version}, it would mean to ensure that variables with a version \texttt{v} are deleted from memory before the protocol transitions to version \texttt{v+1}.
 
 We can treat this new memory predicate not only as a predicate abstracting over memory but also as an obligation to securely delete the associated value from memory. %to delete it securely.
-To do this, we can enforce, when the protocol version changes, that all existing permissions for this new memory predicate have an appropriate version number.
+To do this, we can enforce, when the protocol version changes, that all instances of this new memory predicate have an appropriate version number.
 Additionally, \emph{leak checks} can be implemented
 %for functions that require a permission to this new predicate to ensure that the permission is returned after the function call.
-to ensure that all such permissions are returned after function calls.
-This would enforce that such permissions with old versions would have to be deleted with a dedicated secure deletion function before the protocol version is incremented. This delete function would be the only way to discharge obligations resulting from the new memory predicate.
+to ensure that all predicate instances are returned after function calls.
+This enforces that byte arrays with a version have to be deleted with a dedicated secure deletion function before the protocol version is incremented. This delete function would be the only way to discharge obligations resulting from the new memory predicate.
 
 Gobra does not support leak checks yet but Viper~\cite{muller2016viper}, on which Gobra builds, offers \texttt{forperm} expressions that allow us to encode them.
 In order to achieve our final goal of supporting properties like forward secrecy in the reusable verification library, we will have to extend the library with this new memory predicate, a library method that we assume securely deletes memory, and leak checks. For the latter, we have to extend Gobra to support obligations, building on Viper's \texttt{forperm} expressions.
@@ -217,7 +236,7 @@ In order to achieve our final goal of supporting properties like forward secrecy
       \item \textbf{Methodology.} Present a methodology that extends Arquint's and al. work on protocol implementation verification, and that would allow to verify the deletion of old data in a protocol implementation. This methodology would ultimately allow the verification of high-level security properties relying on data deletion, such as forward secrecy.
       \item \textbf{Extension of Gobra.} Extend the Gobra verifier to provide an obligation mechanism on top of Viper's primitives.
       % Extend the Gobra verifier to support the deletion of old data, based on existing Viper's primitives.
-      Support will be limited to particular functions that will be useful for implementing the verification library extension in the next step.
+      % Support will be limited to particular functions that will be useful for implementing the verification library extension in the next step.
       % This may come down to implementing an obligation discharge mechanism, that would then be used to discharge obligations coming from the new memory predicates.
       \item \textbf{Extension of the Go Reusable Verification Library.} Extend the reusable verification library to support the deletion of old data, based on the new functionalities added to the Gobra verifier at the previous step. The library will then provide higher-level APIs to handle the deletion mechanism, that will be useful for verifying protocol implementations.
       \item \textbf{Implementation of an example protocol.} Using the previously extended verification library, implement and verify a small protocol relying on frequent deletion of sensitive data. Verifying a high-level property such as forward secrecy will showcase the potential of the methodology.
