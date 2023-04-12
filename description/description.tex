@@ -23,8 +23,8 @@
 
 \author{Hugo Queinnec \\ \\ Supervisors: Linard Arquint, Prof. Dr. Peter Müller \\
 Department of Computer Science, ETH Zurich}
-\date{Start: 6th March 2023 \\
-      End: 6th September 2023 \\
+\date{Start: 12th March 2023 \\
+      End: 12th September 2023 \\
 }
 
 \begin{document}
@@ -234,10 +234,9 @@ In order to achieve our final goal of supporting properties like forward secrecy
 
 \begin{itemize}
       \item \textbf{Methodology.} Present a methodology that extends Arquint's and al. work on protocol implementation verification, and that would allow to verify the deletion of old data in a protocol implementation. This methodology would ultimately allow the verification of high-level security properties relying on data deletion, such as forward secrecy.
-      \item \textbf{Extension of Gobra.} Extend the Gobra verifier to provide an obligation mechanism on top of Viper's primitives.
-      % Extend the Gobra verifier to support the deletion of old data, based on existing Viper's primitives.
-      % Support will be limited to particular functions that will be useful for implementing the verification library extension in the next step.
-      % This may come down to implementing an obligation discharge mechanism, that would then be used to discharge obligations coming from the new memory predicates.
+      \item \textbf{Extension of Gobra.}
+      % Extend the Gobra verifier to provide an obligation mechanism on top of Viper's primitives.
+      Extend the Gobra verifier to support the specific types of obligations required for this project, based on existing Viper primitives.
       \item \textbf{Extension of the Go Reusable Verification Library.} Extend the reusable verification library to support the deletion of old data, based on the new functionalities added to the Gobra verifier at the previous step. The library will then provide higher-level APIs to handle the deletion mechanism, that will be useful for verifying protocol implementations.
       \item \textbf{Implementation of an example protocol.} Using the previously extended verification library, implement and verify a small protocol relying on frequent deletion of sensitive data. Verifying a high-level property such as forward secrecy will showcase the potential of the methodology.
       \item \textbf{Evaluation.} Evaluate the newly developed methodology and its application to the example protocol, both qualitatively and quantitatively, by evaluating the performance of the new Gobra functionality for checking obligations. Discuss its potential and its limitations, and see how it compares to existing approaches, such
