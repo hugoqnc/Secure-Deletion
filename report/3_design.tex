@@ -66,10 +66,10 @@ The intuition of the methodology is to let the developer (that is verifying a pr
 We allow them to do so by providing a \emph{secure} deletion function that is their only way to delete a value. This secure function takes care of fully erasing the value from memory.
 The crucial aspect now is to verify that, before the session version is incremented, the secure deletion function has been called for all versioned values that will no longer be accessible in the new version.
 
-Intuitively, we could solve this problem with a counter. Starting with version $0$, we use the counter $c_0 := 0$.
-Each time we create a versioned value readable in version $0$, we increment the counter $c_0 = c_0 + 1$.
-And each time we delete a versioned value readable in version $0$, we decrement the counter $c_0 = c_0 - 1$.
-When we increment the version of the session, we check that $c_0 = 0$, meaning that all versioned values readable in version $0$ have been deleted.
+Intuitively, we could solve this problem with a counter. Starting with version $i$, we use the counter $c_i := 0$.
+Each time we create a versioned value readable in version $0$, we increment the counter $c_i = c_i + 1$.
+And each time we delete a versioned value readable in version $0$, we decrement the counter $c_i = c_i - 1$.
+When we increment the version of the session, we check that $c_i = 0$, meaning that all versioned values readable in version $i$ have been deleted.
 
 With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
@@ -80,6 +80,22 @@ To solve this problem without the limitations of a counter variable, we will cre
 
 \section{Counting permissions}
 
+Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions.
+We build our method on the same intuition as the approach explained in the section above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
+
+We start by introducing the notion of counting permissions.
+Because these permissions are not available in the current version of Gobra, we then explain how we can obtain similar functionality using the existing permission system.
+
 \subsection{Introduction}
+
+Counting permissions are a permission model where permission shares are valued in $\mathbb{Z}\cup\{u\}$, where $u$ represents the identity element of the share addition operation. A share of value $0$ means full permission, a share of value $u$ means no permission, and any other value means partial permission. A non-negative share $n\geq0$ is called a token \emph{factory} and can be split, for any integer $k>0$, into another factory $n+k$ and an equivalent amount of negative token \emph{bundles} of value $-k<0$. A token factory and some amount of token bundles can be summed, and the result is always non-negative (because the subtracted bundle value had to be added to the factory before). 
+
+In practical terms, this means that starting with full permission ($0$) of some term, one could use it as a counter. It could be incremented by splitting it into a factory~$1$ and a bundle~$-1$. A second increment would create a factory~$2$ and a second bundle~$-1$. Invertly, decrementing the counter could be done by summing the factory~$2$ with a bundle~$-1$, resulting in a factory~$1$.
+
+In our use case, using this counting permissions model, we could use a dummy term $t_i$, on which we initially have full permission $n := 0$. The library functions that create a versioned term readable in version $i$ would require access to the token factory $n\geq0$ of $t_i$, and would return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure delete function would return a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, he will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on $t_i$.
+
+The major difference with a simple counter variable is that the developer \emph{cannot} create a $-1$ token bundle the way they could just decrement the counter variable. They \emph{have to} delete all $i$-versioned terms and cannot circumvent the deletion mechanism.
+
+% TODO_ "-1 token bundle" or "token bundle -1"?
 
 \subsection{Implementation in Gobra}
