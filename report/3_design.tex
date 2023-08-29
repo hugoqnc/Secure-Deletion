@@ -1,1 +1,85 @@
 \chapter{Design}
+
+% We want to extend the work of Arquint et al. \cite{} to support the safe deletion of old data.
+% Practically, we want to extend their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like post-compromise security.
+
+\section{Overview}
+
+This section gives an overview to better understand the high-level idea of our methodology.
+
+With the aim of verifying properties like forward secrecy and post-compromise security for a protocol implementation, we need to model the fact that some ephemeral values should only exist for a limited amount of time.
+To do so, we first add a way to specify temporality at the verification level: \emph{versions}, that define time frames during which some terms are accessible.
+Then, as we specify that a term should only be able to exist in some time frame, we reason about how to enforce that it is deleted before this time frame ends.
+
+\subsection{Versions}
+
+% Note: Versions will already have been introduced in the DY* chapter of the Background
+In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, that keeps track of the current version of the protocol.
+Each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers as well. Formally, a version identifier is a triplet identifier of the form $(p, s, v)$, where $p$ is a participant, $s$ is a session, and $v$ is a version.
+
+We distinguish two cases: \emph{versioned} and \emph{unversioned} terms.
+A term is said to be versioned if it is made to be accessible only in one or several specific versions, while it is said to be unversioned if it is made to be accessible by a participant or a session. 
+An unversioned term accessible by some session is therefore accessible by all versions of that session.
+
+The existing methodology already enforces that unversioned terms can only be accessed by participants or sessions allowed by their secrecy label.
+A key property of our methodology extension is to ensure that versioned terms can only be accessed by the specific versions allowed by their secrecy label. Intuitively, this means that an ephemeral key, defined as a versioned value, should only be accessible during a limited time frame defined by the versions allowed by its secrecy label.
+
+On a high level, this requires two kinds of checks.
+First, we enforce when creating a versioned term that it should be readable in the current version of the protocol.
+Second, we enforce that when increasing the version of a session, all versioned terms that are no longer accessible in the new version are deleted.
+While the first check can be easily implemented similarly to the existing check for unversioned terms, the second check requires more work. Indeed, using Gobra, there is no trivial way to check a condition on \emph{all versioned terms}.
+
+This second check is crucial as it will drive the deletion mechanism, and ensure that ephemeral keys are deleted when they are no longer needed. Let us discuss this in more detail.
+
+% TODO_
+% - Say that it does not change to ability to verify unversioned protocols in the same way
+% - Write somewhere about terms with a label containing a session and a version of the same session
+
+\subsection{Enforcing deletion of old data}
+
+Before increasing the version of a session, we have to securely delete all versioned terms that are no longer accessible in the new version. By doing so, we more generally ensure that terms are only accessible in the time frames allowed by their secrecy label.
+
+While this problem has already been solved in DY*, we show that their approach is not applicable in our case. We then introduce our approach on a high level.
+
+\subsubsection{Existing approach in DY*}
+
+In DY*, a participant uses a storage API to store all of its knowledge on the trace.
+In particular, it stores the knowledge of ongoing sessions into an array, composed of each serialized session state.
+Each session is given a version number.
+To update some session state, the participant first reads and deserializes the corresponding session state from the array, then modifies it, and finally serializes and stores it back into the array.
+The participant can also update and increment the version number at this point.
+
+Upon serialization and storage of the updated check, an invariant is checking that only values still accessible in the session's version are stored.
+Thus, only data from the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory.
+Building on this, they can prove forward secrecy and post-compromise security for protocols like Signal.
+
+However, DY* does not enforce that outdated keys are \emph{securely} deleted from memory. They only show that they are not present in the current scope, but outdated keys are not explicitly zeroed out from memory.
+Moreover, this solution does not apply to existing implementations because their state is not stored on a trace, making it impossible to express such an invariant.
+Furthermore, DY* enforces the invariant over state only at certain time points, namely when the state is stored on the trace, without taking into account the state in-between.
+% TODO_ Is this relevant?
+
+\subsubsection{Our approach}
+
+As we cannot simply iterate over the full session state to remove outdated keys like in DY*, we present a new approach to enforce that versioned values are deleted before they are no longer accessible.
+
+The intuition of the methodology is to let the developer (that is verifying a protocol implementation) choose when to delete a versioned value.
+We allow them to do so by providing a \emph{secure} deletion function that is their only way to delete a value. This secure function takes care of fully erasing the value from memory.
+The crucial aspect now is to verify that, before the session version is incremented, the secure deletion function has been called for all versioned values that will no longer be accessible in the new version.
+
+Intuitively, we could solve this problem with a counter. Starting with version $0$, we use the counter $c_0 := 0$.
+Each time we create a versioned value readable in version $0$, we increment the counter $c_0 = c_0 + 1$.
+And each time we delete a versioned value readable in version $0$, we decrement the counter $c_0 = c_0 - 1$.
+When we increment the version of the session, we check that $c_0 = 0$, meaning that all versioned values readable in version $0$ have been deleted.
+
+With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
+
+However, this approach cannot be trivially implemented in our case because we cannot just use a counter \emph{variable} that the developer could access at will: they would just have to manually set it to $0$ before incrementing the version of the session, and the counter check would be meaningless.
+% Additionally, this simplified approach has several limitations, that will be discussed case by case in section \ref{sec:}.
+
+To solve this problem without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
+
+\section{Counting permissions}
+
+\subsection{Introduction}
+
+\subsection{Implementation in Gobra}
