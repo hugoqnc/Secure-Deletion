@@ -7,12 +7,35 @@
 
 \section{Overview}
 \label{sec:overview}
+% TODO_ Isn't it more of an introduction?
 
 This section gives an overview to better understand the high-level idea of our methodology.
 
 With the aim of verifying properties like forward secrecy and post-compromise security for a protocol implementation, we need to model the fact that some ephemeral values should only exist for a limited amount of time.
 To do so, we first add a way to specify temporality at the verification level: \emph{versions}, that define time frames during which some terms are accessible.
 Then, as we specify that a term should only be able to exist in some time frame, we reason about how to enforce that it is deleted before this time frame ends.
+
+\subsection{Goal}
+\label{sec:goal}
+
+We aim to verify protocol implementations that frequently renew their communication keys to provide strong security properties.
+A notable example is the Signal Double Ratchet protocol. To make our point simpler, we consider a simplified version of this protocol, the Diffie-Hellman (DH) ratchet.
+The DH ratchet is a continuous key agreement protocol, that repeatedly performs Diffie Hellman key exchanges to encrypt each message with its own key.
+% TODO_ Add a figure: Can I reuse the one from DY*?
+% TODO_ Should I explain what a DH key exchange is?
+
+It starts with an established key $K_0$, mutually shared by both participants.
+The initiator uses the responder's public key and a newly generated secret key to compute a Diffie-Hellman secret. 
+This newly generated secret is then blended with $K_0$, resulting in the derivation of a fresh key $K_1$.
+This step of generating a new key from the previous one is called a \emph{ratcheting step}.
+Then, $K_1$ is used to encrypt the message sent to the responder, accompanied by the initiator's new public key.
+The responder can obtain the Diffie-Hellman shared secret and take the same ratcheting step to obtain $K_1$, then use it to decrypt the message.
+This iterative process continues for each message, with the initiator and the responder continuously ratcheting.
+
+After this ratcheting process has been performed and has given us a key $K_n$, the previous key $K_{n-1}$ is no longer needed and is deleted.
+
+% TODO_ Explain how this relates to forward secrecy and post-compromise security.
+
 
 \subsection{Versions}
 \label{sec:versions}
@@ -250,11 +273,13 @@ Finally, the postcondition (line 10) states that the developer will receive the 
 
 % TODO_ mention the convert function at some point, and explain that it justifies our choice
 
-\subsection{Deletion of versioned values}
-
 \subsection{Creating values with multiple versions for ratcheting}
 
+
+
 \subsubsection{Key derivation functions}
+
+\subsection{Deletion of versioned values}
 
 \subsection{Increasing the version of a session}
 
