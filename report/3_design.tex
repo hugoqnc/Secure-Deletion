@@ -3,6 +3,8 @@
 % We want to extend the work of Arquint et al. \cite{} to support the safe deletion of old data.
 % Practically, we want to extend their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like post-compromise security.
 
+% Explain that we will use "the developer" to mention the person who will use the library to verify a protocol implementation
+
 \section{Overview}
 
 This section gives an overview to better understand the high-level idea of our methodology.
@@ -13,7 +15,7 @@ Then, as we specify that a term should only be able to exist in some time frame,
 
 \subsection{Versions}
 
-% Note: Versions will already have been introduced in the DY* chapter of the Background
+% TODO_ Versions must have been introduced in the DY* chapter of the Background
 In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, that keeps track of the current version of the protocol.
 Each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers as well. Formally, a version identifier is a triplet identifier of the form $(p, s, v)$, where $p$ is a participant, $s$ is a session, and $v$ is a version.
 
@@ -66,10 +68,12 @@ The intuition of the methodology is to let the developer (that is verifying a pr
 We allow them to do so by providing a \emph{secure} deletion function that is their only way to delete a value. This secure function takes care of fully erasing the value from memory.
 The crucial aspect now is to verify that, before the session version is incremented, the secure deletion function has been called for all versioned values that will no longer be accessible in the new version.
 
-Intuitively, we could solve this problem with a counter. Starting with version $i$, we use the counter $c_i := 0$.
+Intuitively, we could solve this problem with a counter. Starting with version $i$, we use the counter $c_i:=0$.
 Each time we create a versioned value readable in version $0$, we increment the counter $c_i = c_i + 1$.
 And each time we delete a versioned value readable in version $0$, we decrement the counter $c_i = c_i - 1$.
 When we increment the version of the session, we check that $c_i = 0$, meaning that all versioned values readable in version $i$ have been deleted.
+
+% TODO_ Should I mention that this easy explanation does not work for values readable in multiple versions, and refer the reader to a future section?
 
 With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
@@ -90,12 +94,61 @@ Because these permissions are not available in the current version of Gobra, we 
 
 Counting permissions are a permission model where permission shares are valued in $\mathbb{Z}\cup\{u\}$, where $u$ represents the identity element of the share addition operation. A share of value $0$ means full permission, a share of value $u$ means no permission, and any other value means partial permission. A non-negative share $n\geq0$ is called a token \emph{factory} and can be split, for any integer $k>0$, into another factory $n+k$ and an equivalent amount of negative token \emph{bundles} of value $-k<0$. A token factory and some amount of token bundles can be summed, and the result is always non-negative (because the subtracted bundle value had to be added to the factory before). 
 
-In practical terms, this means that starting with full permission ($0$) of some term, one could use it as a counter. It could be incremented by splitting it into a factory~$1$ and a bundle~$-1$. A second increment would create a factory~$2$ and a second bundle~$-1$. Invertly, decrementing the counter could be done by summing the factory~$2$ with a bundle~$-1$, resulting in a factory~$1$.
+In practical terms, this means that starting with full permission ($0$) of some predicate one could use it as a counter. It could be incremented by splitting it into a factory~$1$ and a bundle~$-1$. A second increment would create a factory~$2$ and a second bundle~$-1$. Invertly, decrementing the counter could be done by summing the factory~$2$ with a bundle~$-1$, resulting in a factory~$1$.
 
-In our use case, using this counting permissions model, we could use a dummy term $t_i$, on which we initially have full permission $n := 0$. The library functions that create a versioned term readable in version $i$ would require access to the token factory $n\geq0$ of $t_i$, and would return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure delete function would return a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, he will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on $t_i$.
+In our use case, using this counting permissions model, we could use a dummy predicate $p_i$, on which we initially have full permission $n:=0$. The library functions that create a versioned term readable in version $i$ would require access to the token factory $n\geq0$ of $p_i$, and would return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure delete function would return a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, he will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on $p_i$.
 
 The major difference with a simple counter variable is that the developer \emph{cannot} create a $-1$ token bundle the way they could just decrement the counter variable. They \emph{have to} delete all $i$-versioned terms and cannot circumvent the deletion mechanism.
 
 % TODO_ "-1 token bundle" or "token bundle -1"?
 
 \subsection{Implementation in Gobra}
+
+% TODO_ The fractional permission system must have been introduced in the Background chapter
+Gobra does not use counting permissions and relies only on the fractional permissions model.
+Recall that in this model, permission shares are valued in $[0,1]\cap\mathbb{Q}$, and a share of value $0/1$ means no permission, a share of value $1/1$ means full permission, and any other value means partial permission.
+
+While fully replicating counting permissions from fractional permissions does not seem possible, we just need to obtain some level of functionality sufficient to implement our deletion mechanism.
+
+\subsubsection{Idea}
+
+We introduce below the two abstract predicates that we will use to implement our deletion mechanism.
+
+\begin{gobra}
+pred guard(v uint32)
+pred receipt(key []byte, v uint32)
+\end{gobra}
+
+The \texttt{guard} predicate can be seen as the token factory and is initially given with full permission ($1/1$) to the developer.
+The \texttt{receipt} predicate can be seen as a token bundle.
+The idea is for all library functions that create a versioned value \texttt{key} readable in version \texttt{v} to require partial permission to \texttt{guard(v)}, and to return the same amount of permission of \texttt{receipt(key, v)}.
+Then, upon deletion of \texttt{key}, the secure deletion function requires some amount of permission of \texttt{receipt(key, v)} and returns the same amount of permission of \texttt{guard(v)}.
+
+In practice, the developer may have to create several \texttt{v}-versioned values and will consume some amount of permission of \texttt{guard(v)} for each of them.
+They will receive the same amount of permission of \texttt{receipt(key, v)} for each of them.
+When they want to increment the version of the session, they will have to delete all \texttt{v}-versioned values and will consume all \texttt{receipt(key, v)} fractional permissions.
+They will receive the same amount of permission of \texttt{guard(v)} for each of them.
+Therefore, we know that no versioned value readable in version \texttt{v} remains in memory when we have full permission on \texttt{guard(v)}.
+
+Similarly to counting permissions, the developer cannot bypass the deletion mechanism because he cannot obtain \texttt{guard} or \texttt{receipt} fractional permissions without going through the library functions.
+This is assuming that the developer does not use Gobra's \texttt{inhale} or \texttt{assume} statements to bypass the permission system.
+
+\subsubsection{Developer responsibility}
+
+With this Gobra implementation, the developer is given more responsibility than in the counting permissions model.
+Indeed, upon creating or deleting a versioned value, the developer chooses the permission amount of the \texttt{guard} or \texttt{receipt} that will be consumed.
+
+When creating versioned values, the developer has to choose small enough permission amounts of \texttt{guard} to consume so that all values can be created.
+For example, if they want to create $3$ versioned values, but consume $1/2$ of \texttt{guard} for the two first values, they will not be able to create the third value because they will not have enough permission of \texttt{guard} left.
+This does not affect the soundness of the methodology but simply prevents the developer from implementing their goal.
+It is therefore their responsibility to carefully choose permission amounts.
+
+When deleting versioned values, the developer has to specify the full permission amount of \texttt{receipt} to consume.
+Indeed, in Gobra, we currently cannot know how much permission of \texttt{receipt} is available in the current context.
+This is why the developer has to manually specify the full permission amount of \texttt{receipt} to consume.
+However, they could specify a smaller amount than the amount they have, and the deletion function call would work.
+However, by doing so, the developer will never be able to retrieve the full \texttt{guard} permission, which will prevent them from incrementing the version of the session.
+Again, the methodology's soundness remains unaffected, the only consequence is the developer's inability to realize their objective.
+It is therefore their responsibility to specify the full \texttt{receipt} permission amount upon deletion.
+
+At the end of the day, we have identified a satisfactory approach for achieving functionality reminiscent of counting permissions in Gobra. Despite placing additional responsibility on the developer, this method is sound and constitutes the core of our deletion mechanism.
