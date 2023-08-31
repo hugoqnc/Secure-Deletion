@@ -26,7 +26,7 @@ A notable example is the Signal Double Ratchet protocol. To make our point simpl
 \subsubsection{Diffie-Hellman Ratchet}
 \label{sec:diffie-hellman-ratchet}
 
-The Diffie-Hellman (DH) Ratchet is a continuous key agreement protocol, that repeatedly performs Diffie-Hellman key exchanges to encrypt each message with its own key.
+The Diffie-Hellman (DH) Ratchet is a continuous key agreement protocol, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with its own key.
 % TODO_ Add a figure: Can I reuse the one from DY*?
 % TODO_ Should I explain what a DH key exchange is?
 
@@ -68,7 +68,7 @@ Our methodology to prove these two strong security properties requires a notion 
 \label{sec:versions}
 
 % TODO_ Versions must have been introduced in the DY* chapter of the Background
-In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, that keeps track of the current version of the protocol.
+In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, which keeps track of the current version of the protocol.
 Each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers as well. Formally, a version identifier is a triplet identifier of the form $(p, s, v)$, where $p$ is a participant, $s$ is a session, and $v$ is a version.
 
 We distinguish two cases: \emph{versioned} and \emph{unversioned} terms.
@@ -133,7 +133,7 @@ When we increment the version of the session, we check that $c_i = 0$, meaning t
 With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
 However, this approach cannot be trivially implemented in our case because we cannot just use a counter \emph{variable} that the developer could access at will: they would just have to manually set it to $0$ before incrementing the version of the session, and the counter check would be meaningless.
-% Additionally, this simplified approach has several limitations, that will be discussed case by case in section \ref{sec:}.
+% Additionally, this simplified approach has several limitations, which will be discussed case by case in section \ref{sec:}.
 
 To solve this problem without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
 
@@ -241,17 +241,16 @@ The library provides three functions to create values: \texttt{CreateNonce} to c
     \begin{gobra}
 requires versionPerm >= 0
 requires versionPerm == 0 ==>
-    tri.GetLabeling(l.Ctx()).CanFlow(l.Snapshot(), nonceLabel,
-                               label.Readers(set[p.Id]{ l.Owner() }))
+    CanFlow(l.Snapshot(), nonceLabel, Readers(set[p.Id]{l.Owner()}))
 requires versionPerm > 0 ==>
-    acc(lib.guard(l.Version()), versionPerm) &&
+    acc(guard(l.Version()), versionPerm) &&
     l.Owner().IsSession() &&
-    tri.GetLabeling(l.Ctx()).CanFlow(l.Snapshot(), nonceLabel,
-                    label.Readers(set[p.Id]{ l.OwnerWithVersion() }))
+    CanFlow(l.Snapshot(), nonceLabel,
+                            Readers(set[p.Id]{l.OwnerWithVersion()}))
 ensures  err == nil && versionPerm > 0 ==>
-    acc(lib.receipt(nonce, l.Version()), versionPerm)
+    acc(receipt(nonce, l.Version()), versionPerm)
 func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
-       ghost versionPerm perm) (nonce []byte, err error) {
+                  ghost versionPerm perm) (nonce []byte, err error) {
     // ...
 }
     \end{gobra}
@@ -259,14 +258,14 @@ func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
     \label{lst:create-nonce}
 \end{figure}
 
-This function takes a \texttt{versionPerm} argument, that is required to be non-negative.
+This function takes a \texttt{versionPerm} argument, which is required to be non-negative.
 The developer can use this argument to specify whether they want to create a versioned or unversioned nonce. Choosing $0$ means that the nonce will be unversioned, and choosing a strictly positive value means versioned.
 
 \subsubsection{Unversioned nonce}
 \label{sec:unversioned-nonce}
 
 In this case, the developer chooses $0$ for the \texttt{versionPerm} argument.
-The only additional precondition (lines 3 and 4) to satisfy is that the given nonce label should flow to the library owner.
+The only additional precondition (lines 2-3) to satisfy is that the given nonce label should flow to the library owner.
 Depending on if sessions are used, the library owner is either a participant $(p)$ or a session $(p,s)$ identifier.
 
 Because no version identifier $(p,s,v)$ flows to $(p,s)$ or $(p)$, we know when verifying this precondition that the nonce label must be composed of some non-versioned identifier, e.g. is unversioned.
@@ -276,18 +275,17 @@ Therefore, when the developer chooses $0$ for the \texttt{versionPerm} argument 
 \label{sec:versioned-nonce}
 
 In this second case, the developer chooses a strictly positive \texttt{versionPerm} value.
-This value is used to specify the amount of permission of \texttt{guard} to consume (line 6), as discussed in section \ref{sec:developer-responsibility}.
+This value is used to specify the amount of permission of \texttt{guard} to consume (line 5), as discussed in section \ref{sec:developer-responsibility}.
 % TODO_ unclear
-Additionally, the library owner must be a session identifier (line 7) and not a participant, because a version identifier $(p,s,v)$ requires a session $s$ to be defined.
-Finally, the nonce label must flow to the library owner \emph{at the current version} (line 8).
+Additionally, the library owner must be a session identifier (line 6) and not a participant, because a version identifier $(p,s,v)$ requires a session $s$ to be defined.
+Finally, the nonce label must flow to the library owner \emph{at the current version} (lines 7-8).
 This is to ensure that the created nonce is readable at least in the current context.
 
 However, the flowing relation is not enough to ensure that the nonce label is actually versioned. To do so, one would have to prove that the nonce label \emph{cannot} flow to the library owner (without version), as shown on this precondition:
 
 \begin{gobra}
 requires versionPerm > 0 ==>
-    !tri.GetLabeling(l.Ctx()).CanFlow(l.Snapshot(), nonceLabel,
-                               label.Readers(set[p.Id]{ l.Owner() }))
+    !CanFlow(l.Snapshot(), nonceLabel, Readers(set[p.Id]{l.Owner()}))
 \end{gobra}
 
 The problem is that such a condition is not trivial to verify in Gobra, which would require significant work for the developer each time they want to create a versioned value.
@@ -296,17 +294,87 @@ If the developer “accidentally” creates a nonce with an unversioned label, b
 However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:} that another way is possible).
 Either way, this will just result in too tight constraints, but but does not call into question the soundness of the deletion mechanism.
 
-Finally, the postcondition (line 10) states that the developer will receive the same amount of (strictly positive) permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was discussed in section \ref{sec:counting-permissions-idea}.
+Finally, the postcondition (lines 9-10) states that the developer will receive the same amount of (strictly positive) permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was discussed in section \ref{sec:counting-permissions-idea}.
 
 % TODO_ mention the convert function at some point, and explain that it justifies our choice
 
 \subsection{Creating values with multiple versions for ratcheting}
 
+When presenting the Diffie-Hellman Ratchet in section \ref{sec:diffie-hellman-ratchet}, we explained the purpose of the ratcheting step, which is to derive a new communication key from the previous one. Once a new communication key has been derived, the previous one is no longer needed and should be deleted.
+Intuitively, the new key should exist in a more recent time frame than the previous one, and both keys should coexist for a short period of time, from the ratcheting step to the deletion of the previous key.
 
+In terms of versions, this means that if the previous key $K_n$ is versioned with the current version $v$, it is not sufficient to only create the new key $K_{n+1}$ with version $v+1$ because it could not coexist with $K_n$.
+% we want to create a new versioned key $K_{n+1}$ with version $v+1$. This way, the developer could increment the session's version after the ratcheting step, which would enforce the deletion of $K_n$.
+Additionally, we have seen in section \ref{sec:versioned-nonce} that creating a versioned key requires it to be readable at least in the current context. This means that when creating $K_{n+1}$, we would have to prove that $K_n$ is readable in the current version $v$. To make $K_{n+1}$ readable both in version $v$ and $v+1$, we could for example use the secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner.
+This label now allows $K_n$ and $K_{n+1}$ to coexist while the session's version is $v$.
+Then, after the ratcheting step, the developer would want to increment the session's version. The methodology enforces that $K_n$ is deleted before the version increment.
 
-\subsubsection{Key derivation functions}
+However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which is not what we want.
+
+\subsubsection{Conversion function}
+
+To solve this problem, we introduce a generic way to proceed for values with a secrecy label flowing to several versions.
+Intuitively, a versioned value \texttt{key} created in version $v$ has consumed some permission of \texttt{guard(v)} and returned some permission of \texttt{receipt(key, v)}.
+If \texttt{key}'s secrecy label also flows to the next version $v+1$, we want to allow \texttt{key} to continue to exist in version $v+1$.
+To do so, we offer the developer to \emph{convert} \texttt{key}'s receipt to a new \texttt{receipt(key, v+1)}. At the same time, we return the consumed \texttt{guard(v)} permission but consume an equivalent amount of \texttt{guard(v+1)} permission.
+This way, it is \emph{as if} the developer had created \texttt{key} directly in version $v+1$.
+This means that before incrementing the session's version to $v+2$, the deletion methodology will either force the developer to delete \texttt{key} or convert it if its secrecy label allows it.
+
+From this intuition, we can define the \texttt{ConvertToNextVersion} function shown in Figure \ref{lst:convert-to-next-version}.
+Similarly to \texttt{CreateNonce}, the library owner must be a session identifier (line 1) and not a participant. A positive fraction of the existing \texttt{receipt} permission and the next version's \texttt{guard} permission is consumed (lines 2-4). Finally, the secrecy label of the value must flow to the next version (line 5-6).
+In return, \texttt{ConvertToNextVersion} returns the same amount of permission of the current version's \texttt{guard} (line 7) that was consumed when creating the value. It also returns a \texttt{receipt} for the next version (line 8).
+
+\begin{figure}
+    \begin{gobra}
+requires l.Owner().IsSession()
+requires versionPerm > 0
+requires acc(receipt(value, l.Version()), versionPerm)
+requires acc(guard(l.Version() + 1), versionPerm)
+requires CanFlow(l.Snapshot(), GetLabel(valueT),
+                        Readers(set[p.Id]{l.OwnerWithNextVersion()}))
+ensures  acc(guard(l.Version()), versionPerm)
+ensures  acc(receipt(value, l.Version() + 1), versionPerm)
+func (l* LabeledLibrary) ConvertToNextVersion(value []byte,
+                                       valueT Term, versionPerm perm)
+    \end{gobra}
+    \caption{Initial implementation of \texttt{ConvertToNextVersion}, converting consumed and emitted \texttt{guard} and \texttt{receipt} permission fractions to the next version when the secrecy label of the value allows it. Preconditions and postconditions that are not relevant to the conversion mechanism have been omitted.}
+    \label{lst:convert-to-next-version}
+\end{figure}
+
+The \texttt{ConvertToNextVersion} function solves our ratcheting problem. While in a protocol session with version $v$, we can obtain a new key $K_{n+1}$ with secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner, from a key $K_n$ versioned with version $v$. At this point, the two keys coexist in version $v$. The developer can then convert $K_{n+1}$ to the next version, meaning that it removes the obligation to create $K_{n+1}$ when incrementing the session's version $v$ to $v+1$, and sets the obligation to delete $K_{n+1}$ when incrementing the session's version $v+1$ to $v+2$. After this conversion, the developer can delete the old key $K_n$ and has now obtained its full \texttt{guard(v)} permission fraction. They can now increment the session's version to $v+1$.
+
+\subsubsection{Handling mutliple guards}
+
+While the conversion function solves the initial ratcheting problem, it introduces a new challenge: we now have to deal with two \texttt{guard} predicates at the same time, one for the current version and one for the next one.
+Because a session's version is initialized at $0$, it implies giving the developer full permission on both \texttt{guard(0)} and \texttt{guard(1)} predicates when creating a session.
+
+However, some parts of the implementation of our deletion mechanism rely on the existence of a single \texttt{guard(v)} predicate, where $v$ is necessarily the current version of the session.
+In particular, some helper functions that play a role in the deletion mechanism do not have access to the session state, so do not know the current version.
+It is then handy to give them access to a \texttt{guard(v)} permission fraction, so they know that $v$ is the current version.
+% For example, the body of \texttt{CreateNonce} calls a trusted implementation, called \texttt{CreateNonceImpl}, which generates a random nonce and stores it in a byte array.
+% As this implementation is in the library, we want to prevent the developer from calling it with arguments that would compromise the soundness of the methodology.
+% In particular, \texttt{CreateNonceImpl} does not have access to the session state, so it does not know the current version. 
+
+We use a simple trick to keep the assumption that there is only one \texttt{guard} predicate at a time. We define an additional predicate:
+\begin{gobra}
+pred guardNext(v uint32)
+\end{gobra}
+
+The \texttt{guardNext} predicate is another abstract predicate, like \texttt{guard}, and is used in our methodology for the same purpose as \texttt{guard}, but for the next version. 
+In practice, it means that we initially give the developer full permission on \texttt{guard(0)} and \texttt{guard\emph{Next}(1)} predicates when creating a session.
+This also requires us to slightly change the \texttt{ConvertToNextVersion} implementation given in Figure \ref{lst:convert-to-next-version}.
+We replace line 4 with the following:
+\begin{gobra}
+requires acc(guardNext(l.Version() + 1), versionPerm)
+\end{gobra}
+
+Using this simple adaptation, we can rely on the fact that at any time, the existing \texttt{guard} predicate has the current version for argument.
+
+\subsubsection{Key derivation functions} % TODO_
 
 \subsection{Deletion of versioned values}
+
+
 
 \subsection{Increasing the version of a session}
 
