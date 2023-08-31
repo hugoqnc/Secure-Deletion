@@ -375,7 +375,7 @@ ensures  acc(receipt(value, l.Version() + 1), versionPerm)
 func (l* LabeledLibrary) ConvertToNextVersion(value []byte,
                                        valueT Term, versionPerm perm)
     \end{gobra}
-    \caption{Initial implementation of \texttt{ConvertToNextVersion}, converting consumed and emitted \texttt{guard} and \texttt{receipt} permission fractions to the next version when the secrecy label of the value allows it. Preconditions and postconditions that are not relevant to the conversion mechanism have been omitted.}
+    \caption{Initial implementation of the abstract \texttt{ConvertToNextVersion} function, converting consumed and emitted \texttt{guard} and \texttt{receipt} permission fractions to the next version when the secrecy label of the value allows it. Preconditions and postconditions that are not relevant to the conversion mechanism have been omitted.}
     \label{lst:convert-to-next-version}
 \end{figure}
 
@@ -409,10 +409,49 @@ requires acc(guardNext(l.Version() + 1), versionPerm)
 
 Using this simple adaptation, we can rely on the fact that at any time, the existing \texttt{guard} predicate has the current version for argument.
 
-\subsubsection{Key derivation functions} % TODO_
-
 \subsection{Increasing the version of a session}
+
+Now that we have seen how to create a versioned value, for one or several versions, and how to delete it, we explain how to increment the version of a session. This is done using the \texttt{BumpVersion} function, whose simplified implementation is provided in Figure \ref{lst:bump-version}.
+
+\begin{figure}
+    \begin{gobra}
+requires acc(guard(l.Version()), 1/1)
+requires nextPerm >= 0
+requires acc(guardNext(l.Version() + 1), nextPerm)
+ensures  l.Version() == old(l.Version()) + 1
+ensures  acc(guard(l.Version()), nextPerm)
+ensures  acc(guardNext(l.Version() + 1), 1/1)
+func (l* LabeledLibrary) BumpVersion(nextPerm perm) {
+    l.manager.version = l.Version() + 1 // Increment the version
+    inhale acc(guard(l.Version()), nextPerm)
+    inhale acc(guardNext(l.Version() + 1), 1/1)
+}
+    \end{gobra}
+    \caption{Implementation of \texttt{BumpVersion}, incrementing the session's version. Preconditions, postconditions and statements that are not relevant to the increment mechanism have been omitted.}
+    \label{lst:bump-version}
+\end{figure}
+
+As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1.
+
+Additionally, we have seen in section \ref{sec:creating-values-with-multiple-versions-for-ratcheting} that when allowed by their secrecy label, $v$-versioned values can be converted to version $v+1$, which consumes a partial permission of the \texttt{guardNext(v+1)} predicate.
+This means that before incrementing the session's version, the developer has some amount of permission of \texttt{guardNext(v+1)} that may vary between $0$ and $1$.
+The \texttt{BumpVersion} function takes a \texttt{nextPerm} argument, which offers the developer the possibility to transform this \texttt{guardNext(v+1)} permission into a \texttt{guard(v+1)} permission (see the preconditions lines 2-3 and the postcondition line 5).
+This happens because the \texttt{BumpVersion} function increments the session's version (done on line 8, ensured on line 4).
+Now that the session's version is $v+1$, the methodology explained in section \ref{sec:handling-mutliple-guards} requires us to use the predicate \texttt{guard(v+1)} instead of \texttt{guardNext(v+1)}.
+Finally, the \texttt{BumpVersion} function returns full permission to the \texttt{guardNext(v+2)} predicate (postcondition line 6).
+% This follows the intuition that each session's version comes with full permission to a \texttt{guard} predicate 
+
+After incrementing the session's version to $v+1$, we are in a similar situation as in version $v$ but with all predicates shifted by one version.
+We have partial permission to \texttt{guard(v+1)}, and we still may have some receipts from values converted before the version increment.
+As those receipts are for version $v+1$, we could delete them to obtain full permission to \texttt{guard(v+1)}.
+In parallel, permissions to \texttt{guard(v+1)} and \texttt{guardNext(v+2)} allow us to create and convert new values, exactly like before.
+
+Note that similarly to section \ref{sec:developer-responsibility}, it is the developer's responsibility to specify the in \texttt{nextPerm} the full amount of permission of \texttt{guardNext(v+1)} that they have. If they provide a lower amount, the function call to \texttt{BumpVersion} will still succeed, but they will not be able to retrieve the full \texttt{guard(v+1)} permission afterward, which will prevent them from incrementing the session's version to $v+2$.
 
 \subsection{Encryption and decryption of versioned values}
 
 % TODO_ Should I add the Mem predicate to code listings?
+% TODO_ Give a rigorous definition of $v$-versioned values.
+% TODO_ Get rid of the confusion between "full permission" and "the full amount of permission available"
+
+% \subsubsection{Key derivation functions} % TODO_
