@@ -291,14 +291,51 @@ requires versionPerm > 0 ==>
 The problem is that such a condition is not trivial to verify in Gobra, which would require significant work for the developer each time they want to create a versioned value.
 Therefore, we decided to not enforce this condition, as it is not necessary to ensure the soundness of the methodology.
 If the developer “accidentally” creates a nonce with an unversioned label, but using strictly positive \texttt{versionPerm} (meant to be used for versioned values), they will not be prevented from doing so.
-However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:} that another way is possible).
+However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:conversion-function} that another way is possible).
 Either way, this will just result in too tight constraints, but but does not call into question the soundness of the deletion mechanism.
 
 Finally, the postcondition (lines 9-10) states that the developer will receive the same amount of (strictly positive) permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was discussed in section \ref{sec:counting-permissions-idea}.
 
 % TODO_ mention the convert function at some point, and explain that it justifies our choice
 
+\subsection{Secure deletion of versioned values}
+\label{sec:secure-deletion-of-versioned-values}
+
+The library provides the function \texttt{DeleteSafely} to securely delete a versioned value. Its simplified implementation is provided in Figure \ref{lst:delete-safely}.
+
+\begin{figure}
+    \begin{gobra}
+requires versionPerm > 0
+requires acc(receipt(value, l.Version()), versionPerm)
+ensures  err == nil ==> acc(guard(l.Version()), versionPerm)
+func (l* LabeledLibrary) DeleteSafely(value []byte,
+                                ghost versionPerm perm) (err error) {
+    // ...
+}
+    \end{gobra}
+    \caption{Implementation of \texttt{DeleteSafely}, used to delete a versioned value. Preconditions, postconditions and arguments that are not relevant to the deletion mechanism have been omitted.}
+    \label{lst:delete-safely}
+\end{figure}
+
+This function behaves like the opposite of the \texttt{CreateNonce} function in the \emph{versioned} case.
+It takes a strictly positive \texttt{versionPerm} argument, which is used to specify the amount of permission of \texttt{receipt} to consume (line 2).
+This same amount of permission of \texttt{guard} is returned (line 3).
+Recall that the \texttt{DeleteSafely} function does not check that the given \texttt{receipt} permission amount for this value is the full amount of permission available.
+But as discussed in section \ref{sec:developer-responsibility}, this is the developer's responsibility to specify the full amount if they want verification to succeed.
+
+To securely erase the value from memory, we used the following implementation:
+\begin{gobra}
+// Overwrite the value with zeros
+for i := range value {
+    value[i] = 0
+}
+// Prevent the compiler from optimizing the entire function
+runtime.KeepAlive(value)
+\end{gobra}
+This ensures that after execution, the value has been physically erased from memory, and is unretrievable.
+
 \subsection{Creating values with multiple versions for ratcheting}
+\label{sec:creating-values-with-multiple-versions-for-ratcheting}
 
 When presenting the Diffie-Hellman Ratchet in section \ref{sec:diffie-hellman-ratchet}, we explained the purpose of the ratcheting step, which is to derive a new communication key from the previous one. Once a new communication key has been derived, the previous one is no longer needed and should be deleted.
 Intuitively, the new key should exist in a more recent time frame than the previous one, and both keys should coexist for a short period of time, from the ratcheting step to the deletion of the previous key.
@@ -312,6 +349,7 @@ Then, after the ratcheting step, the developer would want to increment the sessi
 However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which is not what we want.
 
 \subsubsection{Conversion function}
+\label{sec:conversion-function}
 
 To solve this problem, we introduce a generic way to proceed for values with a secrecy label flowing to several versions.
 Intuitively, a versioned value \texttt{key} created in version $v$ has consumed some permission of \texttt{guard(v)} and returned some permission of \texttt{receipt(key, v)}.
@@ -344,6 +382,7 @@ func (l* LabeledLibrary) ConvertToNextVersion(value []byte,
 The \texttt{ConvertToNextVersion} function solves our ratcheting problem. While in a protocol session with version $v$, we can obtain a new key $K_{n+1}$ with secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner, from a key $K_n$ versioned with version $v$. At this point, the two keys coexist in version $v$. The developer can then convert $K_{n+1}$ to the next version, meaning that it removes the obligation to create $K_{n+1}$ when incrementing the session's version $v$ to $v+1$, and sets the obligation to delete $K_{n+1}$ when incrementing the session's version $v+1$ to $v+2$. After this conversion, the developer can delete the old key $K_n$ and has now obtained its full \texttt{guard(v)} permission fraction. They can now increment the session's version to $v+1$.
 
 \subsubsection{Handling mutliple guards}
+\label{sec:handling-mutliple-guards}
 
 While the conversion function solves the initial ratcheting problem, it introduces a new challenge: we now have to deal with two \texttt{guard} predicates at the same time, one for the current version and one for the next one.
 Because a session's version is initialized at $0$, it implies giving the developer full permission on both \texttt{guard(0)} and \texttt{guard(1)} predicates when creating a session.
@@ -372,11 +411,8 @@ Using this simple adaptation, we can rely on the fact that at any time, the exis
 
 \subsubsection{Key derivation functions} % TODO_
 
-\subsection{Deletion of versioned values}
-
-
-
 \subsection{Increasing the version of a session}
 
 \subsection{Encryption and decryption of versioned values}
 
+% TODO_ Should I add the Mem predicate to code listings?
