@@ -234,8 +234,11 @@ In this section, we explain how we integrate it in Arquint's et al.\ Reusable Ve
 
 \subsection{Creation of versioned values}
 \label{sec:creation-of-versioned-values}
+% TODO_ The Mem predicate must have been introduced in the Background chapter
 
-The library provides three functions to create values: \texttt{CreateNonce} to create some random value, \texttt{GeneratePkeKey} to create a public/private key pair, and \texttt{GenerateDHKey} to create a secret key for Diffie-Hellman key exchange. Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this subsection. Its simplified implementation is provided in Figure \ref{lst:create-nonce}.
+It is easy to categorize functions that create values: they all return full permission to a new memory predicate of the created value.
+The library provides three functions to create values: \texttt{CreateNonce} to create some random value, \texttt{GeneratePkeKey} to create a public/private key pair, and \texttt{GenerateDHKey} to create a secret key for Diffie-Hellman key exchange.
+Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this subsection. Its simplified implementation is provided in Figure \ref{lst:create-nonce}.
 
 \begin{figure}
     \begin{gobra}
@@ -249,6 +252,7 @@ requires versionPerm > 0 ==>
                             Readers(set[p.Id]{l.OwnerWithVersion()}))
 ensures  err == nil && versionPerm > 0 ==>
     acc(receipt(nonce, l.Version()), versionPerm)
+ensures  err == nil ==> Mem(nonce)
 func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
                   ghost versionPerm perm) (nonce []byte, err error) {
     // ...
@@ -260,6 +264,7 @@ func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
 
 This function takes a \texttt{versionPerm} argument, which is required to be non-negative.
 The developer can use this argument to specify whether they want to create a versioned or unversioned nonce. Choosing $0$ means that the nonce will be unversioned, and choosing a strictly positive value means versioned.
+In any case, when the function completes with no error, it returns full permission of the memory predicate \texttt{Mem(nonce)}, expressing that the nonce is now stored in memory.
 
 \subsubsection{Unversioned nonce}
 \label{sec:unversioned-nonce}
@@ -288,7 +293,7 @@ requires versionPerm > 0 ==>
     !CanFlow(l.Snapshot(), nonceLabel, Readers(set[p.Id]{l.Owner()}))
 \end{gobra}
 
-The problem is that such a condition is not trivial to verify in Gobra, which would require significant work for the developer each time they want to create a versioned value.
+Mainly because of the negation, the problem is that such a condition is not trivial to verify in Gobra, which would require significant work for the developer each time they want to create a versioned value.
 Therefore, we decided to not enforce this condition, as it is not necessary to ensure the soundness of the methodology.
 If the developer “accidentally” creates a nonce with an unversioned label, but using strictly positive \texttt{versionPerm} (meant to be used for versioned values), they will not be prevented from doing so.
 However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:conversion-function} that another way is possible).
@@ -307,6 +312,7 @@ The library provides the function \texttt{DeleteSafely} to securely delete a ver
     \begin{gobra}
 requires versionPerm > 0
 requires acc(receipt(value, l.Version()), versionPerm)
+requires Mem(value)
 ensures  err == nil ==> acc(guard(l.Version()), versionPerm)
 func (l* LabeledLibrary) DeleteSafely(value []byte,
                                 ghost versionPerm perm) (err error) {
@@ -319,9 +325,10 @@ func (l* LabeledLibrary) DeleteSafely(value []byte,
 
 This function behaves like the opposite of the \texttt{CreateNonce} function in the \emph{versioned} case.
 It takes a strictly positive \texttt{versionPerm} argument, which is used to specify the amount of permission of \texttt{receipt} to consume (line 2).
-This same amount of permission of \texttt{guard} is returned (line 3).
+This same amount of permission of \texttt{guard} is returned (line 4) when no error has occurred during the deletion process.
 Recall that the \texttt{DeleteSafely} function does not check that the given \texttt{receipt} permission amount for this value is the full amount of permission available.
 But as discussed in section \ref{sec:developer-responsibility}, this is the developer's responsibility to specify the full amount if they want verification to succeed.
+Additionally, \texttt{DeleteSafely} consumes the memory predicate of the deleted value (line 3), expressing that the value is no longer stored in memory.
 
 To securely erase the value from memory, we used the following implementation:
 \begin{gobra}
@@ -449,6 +456,80 @@ In parallel, permissions to \texttt{guard(v+1)} and \texttt{guardNext(v+2)} allo
 Note that similarly to section \ref{sec:developer-responsibility}, it is the developer's responsibility to specify the in \texttt{nextPerm} the full amount of permission of \texttt{guardNext(v+1)} that they have. If they provide a lower amount, the function call to \texttt{BumpVersion} will still succeed, but they will not be able to retrieve the full \texttt{guard(v+1)} permission afterward, which will prevent them from incrementing the session's version to $v+2$.
 
 \subsection{Encryption and decryption of versioned values}
+
+In section \ref{sec:creation-of-versioned-values}, we categorized functions that create values as the ones returning full permission to a new memory predicate of the created value.
+Functions that fit into this category, that we have not mentioned yet, are \emph{encryption} and \emph{decryption} functions.
+Indeed, encryption functions take (and return) read permission to a plaintext, encrypt it to create a ciphertext, and return full permission on a new memory predicate for the ciphertext.
+Invertly, decryption functions take (and return) read permission to a ciphertext, decrypt it to create a plaintext, and return full permission on a new memory predicate for the plaintext.
+Both functions create a new value that is stored in memory (a ciphertext and a plaintext respectively), we should therefore make sure they are compatible with our deletion methodology.
+
+\subsubsection{Encryption}
+
+Encryption is the simpler case. Indeed, an encryption function creates a \emph{public} ciphertext.
+As this ciphertext is meant to be sent on the network, which the attacker can read, it would not make sense to create a ciphertext with a restrictive secrecy label, let alone a versioned one.
+Therefore, we do not need to change the encryption function to support versioned values.
+
+\subsubsection{Decryption}
+
+The decryption case requires more work. 
+Indeed, a decryption function creates a plaintext, whose value is the same as the original plaintext used for encryption. 
+Its secrecy label should therefore be the same as the original plaintext's secrecy label.
+
+As a simple example, suppose that a participant creates a versioned value $key$, and then encrypts and decrypts it.
+They will obtain a copy $key_{copy}=key$ of the initial versioned value, with its own memory predicate.
+While the current deletion methodology forces the developer to delete (or convert) the versioned value $key$ before the next version increment, we need to adapt the methodology to decryption functions to also force the deletion of $key_{copy}$.
+
+Intuitively, we want to treat the decryption function like a creation function and consume some permission of \texttt{guard} only when the created plaintext is versioned.
+However, as the decrypted plaintext is the result of the decryption function, we do not know anything about its secrecy label before calling it. This prevents us from using the plaintext secrecy label in a precondition to the decryption function to condition whether we consume a \texttt{guard} permission or not.
+
+An easier doable solution to this problem would be to always require partial permission of \texttt{guard} when calling the decryption function.
+Then, this permission could be returned later when the developer manages to prove that the decrypted plaintext is unversioned.
+However, this is not ideal because it would always require the developer to use the \texttt{guard} predicate to decrypt, even when verifying a protocol that does not use versioned values at all and should not be affected by the deletion mechanism.
+
+Instead, we take advantage of an existing encryption property implemented in all encryption functions of the library: \emph{the secrecy label of the plaintext must flow to the secrecy label of the encryption secret key\footnote{In asymmetric encryption, while we encrypt with the public key, we consider the label of the private (decryption) key for this property.}}.
+In particular, this means that a versioned plaintext must be encrypted with a versioned key.
+Upon decryption, while we do not know the secrecy label of the plaintext to be created, we know the secrecy label of the key used for decryption.
+The intuition is to consider that versioned encryption keys are mostly used to encrypt versioned plaintexts, so we could require partial permission of \texttt{guard} only when the decryption key is versioned.
+This is a sound overapproximation that should not burden the developer in practice.
+
+Proving that the decryption key is versioned involves proving that its secrecy label \emph{does not} flow to the library owner. We have already seen when creating a versioned nonce section \ref{sec:versioned-nonce} that such negation is not trivial to prove in Gobra.
+Instead, we adopt the same workaround and require the developer to specify whether the decryption key is versioned or not, using a \texttt{versionPerm} argument.
+The simplified implementation of the AEAD decryption function \texttt{AeadDec} is provided in Figure \ref{lst:aead-dec}.
+Like in the \texttt{CreateNonce} function, the \texttt{versionPerm} argument must be non-negative (line 1) and is used to specify whether the decryption key is versioned or not.
+
+\begin{figure}
+    \begin{gobra}
+requires versionPerm >= 0
+requires versionPerm == 0 ==>
+    CanFlow(l.Snapshot(), GetLabel(keyT),
+                                       Readers(set[p.Id]{l.Owner()}))
+requires versionPerm > 0 ==>
+    acc(guard(l.Version()), versionPerm) &&
+    l.Owner().IsSession()
+ensures  err == nil ==> Mem(res)
+ensures  err == nil && versionPerm > 0 ==>
+    acc(receipt(res, l.Version()), versionPerm)
+func (l *LabeledLibrary) AeadDec(ghost keyT tm.Term,
+                    ghost versionPerm perm) (res []byte, err error) {
+    // ...
+}
+    \end{gobra}
+    \caption{Implementation of \texttt{AeadDec}, showcasing the changes to support versioned values in AEAD decryption. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.}
+    \label{lst:aead-dec}
+\end{figure}
+
+If the developer chooses $0$ for the \texttt{versionPerm} argument, the decryption key is meant to be unversioned, which the developer has to prove on lines 2-4.
+In this case, this is the only modification to the original implementation of the \texttt{AeadDec} function.
+Because the decryption key is unversioned, the resulting plaintext is necessarily also unversioned, which justifies that the deletion methodology does not apply in this case.
+
+If the developer chooses a strictly positive \texttt{versionPerm} value, the decryption key is meant to be versioned. 
+As explained before, we do not enforce the verification that the decryption key is versioned. In a similar manner as in section \ref{sec:developer-responsibility}, we can prove that this does not impact soundness and it is in the developer's interest to use a versioned decryption key in this case.
+We then consume a partial permission of \texttt{guard} (line 6) and return the same amount of permission of \texttt{receipt} (lines 9-10).
+Additionally, the library owner must be a session identifier (line 7) for versions to make sense.
+Then, if the decryption process succeeds, the resulting plaintext is returned and a memory predicate is issued (line 8), expressing that it is now stored in memory.
+
+Finally, let's reason about the (rare) case where the encryption key is versioned, but not the encrypted content.
+
 
 % TODO_ Should I add the Mem predicate to code listings?
 % TODO_ Give a rigorous definition of $v$-versioned values.
