@@ -229,11 +229,20 @@ In this section, we explain how we integrate it in Arquint's et al.\ Reusable Ve
 
 \subsection{Storing the current session version}
 \label{sec:storing-the-current-session-version}
-
-% TODO_ Do I need this? What should I write?
 % CanFlow should be introduced in the background
-% Need explanations on the Owner() and OwnerWithVersion()
-% Explain that the version is not stored on the trace but locally, because it would create problems to have it on a concurrent data structure that others can modify
+
+Before we can implement the deletion mechanism in detail, we need a place to store the current version of a protocol session.
+Currently, the library already handles the storage of the current protocol participant and session.
+These are stored in a field called \texttt{owner} that is an identifier, meaning either a participant identifier $(p)$ or a session identifier $(p,s)$, where $p$ is a participant and $s$ is a session.
+This field is used in the concurrent data structure, as a key to a dictionary mapping identifiers to their corresponding snapshot.
+Even though a first thought could be to store the version $v$ as part of the \texttt{owner}, in a version identifier $(p,s,v)$, a protocol participant should keep using the same snapshot mapping during a protocol session.
+
+Therefore, we store the current version of a session in a separate field, as an integer.
+The version is not stored on the global trace, as it would be unnecessary complexity.
+The session is however still stored as part of the library state, which makes it easily accessible to all library functions.
+For a function taking a \texttt{LabeledLibrary} struct \texttt{l}, holding the state of the library, the current version of the session will be referred to as \texttt{l.Version()} in the future code figures.
+The owner is similarly obtainable using \texttt{l.Owner()}.
+Additionally, it is often useful when working with secrecy labels to know the complete version identifier $(p,s,v)$. This is the concatenation of the owner and version fields, which can be obtained using \texttt{l.OwnerWithVersion()}.
 
 \subsection{Creation of versioned values}
 \label{sec:creation-of-versioned-values}
