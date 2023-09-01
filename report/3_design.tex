@@ -1,3 +1,10 @@
+% TODO_ The following notions must have been introduced before:
+% - CanFlow should be introduced in the background
+% - Forward secrecy and post-compromise security (via state) must have been introduced before
+% - Versions must have been introduced in the DY* chapter of the Background
+% - The fractional permission system must have been introduced in the Background chapter
+% - The Mem predicate must have been introduced in the Background chapter
+
 \chapter{Design}
 
 % We want to extend the work of Arquint et al.\ \cite{} to support the safe deletion of old data.
@@ -8,7 +15,6 @@
 \section{Overview}
 \label{sec:overview}
 % TODO_ Isn't it more of an introduction?
-% TODO_ Forward secrecy and post-compromise security (via state) must have been introduced before
 
 This section gives an overview to better understand our goal and the high-level idea of our methodology to achieve it.
 With the aim of verifying properties like forward secrecy and post-compromise security for a protocol implementation, we need to model the fact that some ephemeral values should only exist for a limited amount of time.
@@ -67,7 +73,6 @@ Our methodology to prove these two strong security properties requires a notion 
 \subsection{Versions}
 \label{sec:versions}
 
-% TODO_ Versions must have been introduced in the DY* chapter of the Background
 In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, which keeps track of the current version of the protocol.
 Each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers as well. Formally, a version identifier is a triplet identifier of the form $(p, s, v)$, where $p$ is a participant, $s$ is a session, and $v$ is a version.
 
@@ -76,7 +81,7 @@ A term is said to be versioned if it is made to be accessible only in one or sev
 An unversioned term accessible by some session is therefore accessible by all versions of that session.
 
 The existing methodology already enforces that unversioned terms can only be accessed by participants or sessions allowed by their secrecy label.
-A key property of our methodology extension is to ensure that versioned terms can only be accessed by the specific versions allowed by their secrecy label. Intuitively, this means that an ephemeral key, defined as a versioned value, should only be accessible during a limited time frame defined by the versions allowed by its secrecy label.
+A key property of our methodology extension is to ensure that versioned terms can only be accessed when the session is in a version allowed by their secrecy label. Intuitively, this means that an ephemeral key, defined as a versioned value, should only be accessible during a limited time frame defined by the versions allowed by its secrecy label.
 
 On a high level, this requires two kinds of checks.
 First, we enforce when creating a versioned term that it should be readable in the current version of the protocol.
@@ -85,9 +90,7 @@ While the first check can be easily implemented similarly to the existing check 
 
 This second check is crucial as it will drive the deletion mechanism, and ensure that ephemeral keys are deleted when they are no longer needed. Let us discuss this in more detail.
 
-% TODO_
-% - Say that it does not change to ability to verify unversioned protocols in the same way
-% - Write somewhere about terms with a label containing a session and a version of the same session
+% TODO_ Write somewhere about terms with a label containing a session and a version of the same session
 
 \subsection{Enforcing deletion of old data}
 \label{sec:enforcing-deletion-of-old-data}
@@ -118,6 +121,7 @@ Furthermore, DY* enforces the invariant over state only at certain time points, 
 \label{sec:our-approach}
 
 As we cannot simply iterate over the full session state to remove outdated keys like in DY*, we present a new approach to enforce that versioned values are deleted before they are no longer accessible.
+Note that our approach only \emph{extends} the existing approach of Arquint's et al., which means that our modified library can still be used to verify unversioned protocols in the same way as before.
 
 The intuition of the methodology is to let the developer (that is verifying a protocol implementation) choose when to delete a versioned value.
 We allow them to do so by providing a \emph{secure} deletion function that is their only way to delete a value. This secure function takes care of fully erasing the value from memory.
@@ -127,8 +131,6 @@ Intuitively, we could solve this problem with a counter. Starting with version $
 Each time we create a versioned value readable in version $0$, we increment the counter $c_i = c_i + 1$.
 And each time we delete a versioned value readable in version $0$, we decrement the counter $c_i = c_i - 1$.
 When we increment the version of the session, we check that $c_i = 0$, meaning that all versioned values readable in version $i$ have been deleted.
-
-% TODO_ Should I mention that this easy explanation does not work for values readable in multiple versions, and refer the reader to a future section?
 
 With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
@@ -162,7 +164,6 @@ The major difference with a simple counter variable is that the developer \emph{
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
 
-% TODO_ The fractional permission system must have been introduced in the Background chapter
 Gobra does not use counting permissions and relies only on the fractional permissions model.
 Recall that in this model, permission shares are valued in $[0,1]\cap\mathbb{Q}$, and a share of value $0/1$ means no permission, a share of value $1/1$ means full permission, and any other value means partial permission.
 
@@ -229,7 +230,6 @@ In this section, we explain how we integrate it in Arquint's et al.\ Reusable Ve
 
 \subsection{Storing the current session version}
 \label{sec:storing-the-current-session-version}
-% CanFlow should be introduced in the background
 
 Before we can implement the deletion mechanism in detail, we need a place to store the current version of a protocol session.
 Currently, the library already handles the storage of the current protocol participant and session.
@@ -246,7 +246,6 @@ Additionally, it is often useful when working with secrecy labels to know the co
 
 \subsection{Creation of versioned values}
 \label{sec:creation-of-versioned-values}
-% TODO_ The Mem predicate must have been introduced in the Background chapter
 
 It is easy to categorize functions that create values: they all return full permission to a new memory predicate of the created value.
 The library provides three functions to create values: \texttt{CreateNonce} to create some random value, \texttt{GeneratePkeKey} to create a public/private key pair, and \texttt{GenerateDHKey} to create a secret key for Diffie-Hellman key exchange.
@@ -566,5 +565,3 @@ func (l* LabeledLibrary) GuardFromUnversionedReceipt(value []byte,
 
 % TODO_ Give a rigorous definition of $v$-versioned values.
 % TODO_ Get rid of the confusion between "full permission" and "the full amount of permission available"
-
-% \subsubsection{Key derivation functions} % TODO_
