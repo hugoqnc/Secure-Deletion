@@ -198,6 +198,7 @@ This is used at deletion to verify that we delete the actual value associated wi
 
 \subsubsection{Developer responsibility}
 \label{sec:developer-responsibility}
+% TODO_ move to the delete function
 
 With this Gobra implementation, the developer is given more responsibility than in the counting permissions model.
 Indeed, upon creating or deleting a versioned value, the developer chooses the permission amount of the \texttt{guard} or \texttt{receipt} that will be consumed.
@@ -230,7 +231,9 @@ In this section, we explain how we integrate it in Arquint's et al.\ Reusable Ve
 \label{sec:storing-the-current-session-version}
 
 % TODO_ Do I need this? What should I write?
-% Need explanations of the LabeledLibrary, the Owner() and OwnerWithVersion(), CanFlow
+% CanFlow should be introduced in the background
+% Need explanations on the Owner() and OwnerWithVersion()
+% Explain that the version is not stored on the trace but locally, because it would create problems to have it on a concurrent data structure that others can modify
 
 \subsection{Creation of versioned values}
 \label{sec:creation-of-versioned-values}
@@ -528,10 +531,30 @@ We then consume a partial permission of \texttt{guard} (line 6) and return the s
 Additionally, the library owner must be a session identifier (line 7) for versions to make sense.
 Then, if the decryption process succeeds, the resulting plaintext is returned and a memory predicate is issued (line 8), expressing that it is now stored in memory.
 
-Finally, let's reason about the (rare) case where the encryption key is versioned, but not the encrypted content.
+Finally, let's reason about the case where the encryption key is versioned, but not the encrypted content.
+This case is expected to be rare in practice, as there are no benefits in encrypting an unversioned plaintext (that could exist for a whole session) with a versioned key (that is bound to exist for a short period of time).
+However, if it happens, the developer is forced to hand a strictly positive permission fraction of \texttt{guard}. 
+They will receive the same amount of permission of \texttt{receipt} for the plaintext in return, as if it was versioned.
+But because the plaintext is unversioned and exists in the current version, it means that its secrecy label allows the current session or participant to access it.
+This means that it could be converted to the next version infinitely with the \texttt{ConvertToNextVersion} function, which would allow the value to keep existing in memory despite version increments.
+Although it works, converting this value for each version would be a burden in practice.
+This is way we offer an additional simple function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, that checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5) to “remove” it from the deletion mechanism.
 
+\begin{figure}
+    \begin{gobra}
+requires versionPerm > 0
+requires acc(receipt(value, l.Version()), versionPerm)
+requires CanFlow(l.Snapshot(), GetLabel(valueT),
+    Readers(set[p.Id]{l.Owner()}))
+ensures  acc(lib.guard(l.Version()), versionPerm)
+func (l* LabeledLibrary) GuardFromUnversionedReceipt(value []byte,
+    valueT Term, versionPerm perm)
+}
+    \end{gobra}
+    \caption{Implementation of the abstract \texttt{GuardFromUnversionedReceipt} function, removing an unversioned value from the deletion mechanism. Preconditions and postconditions that are not relevant to the deletion mechanism have been omitted.}
+    \label{lst:guard-from-unversioned-receipt}
+\end{figure}
 
-% TODO_ Should I add the Mem predicate to code listings?
 % TODO_ Give a rigorous definition of $v$-versioned values.
 % TODO_ Get rid of the confusion between "full permission" and "the full amount of permission available"
 
