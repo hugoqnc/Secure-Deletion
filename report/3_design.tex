@@ -260,12 +260,12 @@ requires versionPerm > 0 ==>
     acc(guard(l.Version()), versionPerm) &&
     l.Owner().IsSession() &&
     CanFlow(l.Snapshot(), nonceLabel,
-                            Readers(set[p.Id]{l.OwnerWithVersion()}))
+        Readers(set[p.Id]{l.OwnerWithVersion()}))
 ensures  err == nil && versionPerm > 0 ==>
     acc(receipt(nonce, l.Version()), versionPerm)
 ensures  err == nil ==> Mem(nonce)
 func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
-                  ghost versionPerm perm) (nonce []byte, err error) {
+    ghost versionPerm perm) (nonce []byte, err error) {
     // ...
 }
     \end{gobra}
@@ -326,7 +326,7 @@ requires acc(receipt(value, l.Version()), versionPerm)
 requires Mem(value)
 ensures  err == nil ==> acc(guard(l.Version()), versionPerm)
 func (l* LabeledLibrary) DeleteSafely(value []byte,
-                                ghost versionPerm perm) (err error) {
+    ghost versionPerm perm) (err error) {
     // ...
 }
     \end{gobra}
@@ -387,11 +387,11 @@ requires versionPerm > 0
 requires acc(receipt(value, l.Version()), versionPerm)
 requires acc(guard(l.Version() + 1), versionPerm)
 requires CanFlow(l.Snapshot(), GetLabel(valueT),
-                        Readers(set[p.Id]{l.OwnerWithNextVersion()}))
+    Readers(set[p.Id]{l.OwnerWithNextVersion()}))
 ensures  acc(guard(l.Version()), versionPerm)
 ensures  acc(receipt(value, l.Version() + 1), versionPerm)
 func (l* LabeledLibrary) ConvertToNextVersion(value []byte,
-                                       valueT Term, versionPerm perm)
+    valueT Term, versionPerm perm)
     \end{gobra}
     \caption{Initial implementation of the abstract \texttt{ConvertToNextVersion} function, converting consumed and emitted \texttt{guard} and \texttt{receipt} permission fractions to the next version when the secrecy label of the value allows it. Preconditions and postconditions that are not relevant to the conversion mechanism have been omitted.}
     \label{lst:convert-to-next-version}
@@ -513,7 +513,7 @@ Like in the \texttt{CreateNonce} function, the \texttt{versionPerm} argument mus
 requires versionPerm >= 0
 requires versionPerm == 0 ==>
     CanFlow(l.Snapshot(), GetLabel(keyT),
-                                       Readers(set[p.Id]{l.Owner()}))
+        Readers(set[p.Id]{l.Owner()}))
 requires versionPerm > 0 ==>
     acc(guard(l.Version()), versionPerm) &&
     l.Owner().IsSession()
@@ -521,7 +521,7 @@ ensures  err == nil ==> Mem(res)
 ensures  err == nil && versionPerm > 0 ==>
     acc(receipt(res, l.Version()), versionPerm)
 func (l *LabeledLibrary) AeadDec(ghost keyT tm.Term,
-                    ghost versionPerm perm) (res []byte, err error) {
+    ghost versionPerm perm) (res []byte, err error) {
     // ...
 }
     \end{gobra}
@@ -565,3 +565,55 @@ func (l* LabeledLibrary) GuardFromUnversionedReceipt(value []byte,
 
 % TODO_ Give a rigorous definition of $v$-versioned values.
 % TODO_ Get rid of the confusion between "full permission" and "the full amount of permission available"
+
+% TODO_ How to present this as the summary of the whole section?
+In summary, we have seen how we adapted the Reusable Verification Library to support versioned values, and how the implemented mechanism enforces the deletion of those values at the end of their time frame.
+While the end result is functional and sound, we have come across various challenges that we had to solve by complexifying the methodology a bit.
+In the next section, we will give a glimpse into an alternative approach to implementing the deletion mechanism more simply, if our verifier, Gobra, had supported \emph{obligations}.
+
+\section{Alternative design using obligations}
+
+An obligation, defined for a thread, specifies an action to be eventually performed by this thread~\cite{}. An obligation is initially \emph{emitted}, and once the action is performed, the obligation is \emph{discharged}.
+
+In this section, we first present how we could use obligations to implement the deletion mechanism in a simpler way.
+Then, as Gobra does not support obligations, we present a way to add them to the language.
+This section will not be as exhaustive as the description of our deletion mechanism and only aims at giving an intuition of how obligations could be used to implement it.
+
+\subsubsection{Idea}
+
+With a verifier supporting obligations, we could, upon creation of a time-sensitive value, emit an obligation to delete it before the next version increment. 
+In practice, the obligation would be a construct linking the versioned value to its version number.
+The obligation can then be discharged upon calling the secure deletion function on the value.
+Then, when incrementing the protocol's session version, we check that all existing obligations are valid: in our case, the version defined in the obligation is equal to the new version number.
+This means that “old” obligations, with the previous version number, must have been discharged before the version increment.
+
+The obligation mechanism would therefore be composed of two main parts: an obligation construct, and a way to check all existing obligations.
+
+\subsubsection{Adding obligations to Gobra}
+
+To add obligations to Gobra, we first need to define the obligation construct.
+It should be parameterized by the value and its version number.
+The easiest way to do it, to avoid modifying the language, is to use an abstract predicate:
+\begin{gobra}
+pred Obl(key []byte, version uint32)
+\end{gobra}
+This predicate could then be emitted upon creation of a versioned value, by returning it in the creation function's postcondition.
+Invertly, the secure deletion function would require the obligation as a precondition, and would not return it to discharge it.
+
+The second part of the mechanism is to have a function capable of checking all existing obligations. This function could then be called upon incrementing the session's version.
+To do so, our main challenge is to ensure that this function has access to all existing obligations in its scope.
+Indeed, if the obligation predicates are not passed in function calls from a caller to a callee, they will \emph{leak} and will not be visible to the callee. It would be as if the obligation had been discharged.
+
+To avoid this, we introduce leak checks.
+The idea is to add preconditions and postconditions to all functions to make sure that all obligations in scope are passed in function calls. This ensures that in any function, all existing obligations are in scope.
+When verifying Gobra files, the Gobra code is first translated to Viper code, which is then verified.
+To add leak checks to all Gobra functions, we could modify the translation process to automatically add leak checks to all Viper functions.
+Such leak check can be defined in Viper using the \texttt{forperm} construct, which allows iteration over all permissions in scope:
+\begin{gobra}
+define leak_check [true, forperm k: Ref, v: Int [Obl(k, v)] :: false]
+\end{gobra}
+Without going into details, this leak check expression, when used as a precondition, makes sure that the function caller passes all obligations in its scope to the callee. And when used as a postcondition, it makes sure that the function callee returns all obligations in its scope to the caller.
+Now that no obligation leaks, we could check the version of all existing obligations upon incrementing the session's version, with a similar \texttt{forperm} expression.
+
+Therefore, using leak checks, we provide a simple way to implement obligations in Gobra to ultimately implement a deletion mechanism.
+Note that the given leak check mechanism, given for the sake of simplicity, is not optimal yet. Indeed, it requires passing all obligations in scope, even when calling a function that does not need to read them, which can be a burden for the developer. The approach could be improved by providing a way to frame obligations around function calls that do not need them.
