@@ -55,6 +55,7 @@ After this ratcheting process has been performed and has given us a communicatio
 
 \subsubsection{Security properties}
 \label{sec:security-properties}
+\todo{This may move to the Background chapter}
 
 \paragraph{Forward secrecy.}
 \label{sec:forward-secrecy}
@@ -107,7 +108,7 @@ While this problem has already been solved in DY*, we show that their approach i
 
 \subsubsection{Existing approach in DY*}
 \label{sec:existing-approach-in-dy}
-\todo\{\}This may move to the Background chapter
+\todo{This may move to the Background chapter}
 
 In DY*, a participant uses a storage API to store all of its knowledge on the trace.
 In particular, it stores the knowledge of ongoing sessions into an array, composed of each serialized session state.
@@ -200,9 +201,20 @@ This is assuming that the developer does not use Gobra's \texttt{inhale} or \tex
 
 Note that the receipt predicate takes the created byte array \texttt{key} as an argument.
 This is used at deletion to verify that we delete the actual value associated with the receipt, before returning the \texttt{guard(v)} permission fraction. Otherwise, the developer could simply delete arbitrary (unversioned) values to transform some \texttt{receipt(key, v)} permission fraction into a \texttt{guard(v)} permission fraction, and circumvent the guarantee of deletion of versioned values.
+We can express the fact that our deletion mechanism cannot be circumvented with the following definition:
 
-\subsubsection{Developer interest}
-\label{sec:developer-interest}
+\begin{definition}\label{def:sum-perm-leq-1}
+
+    Let $v$ represent the current version of the session and $n$ the number of $v$-versioned values in the current state. $\forall i \in \llbracket 0, n \rrbracket$, we denote $key_i$ the $i$-th $v$-versioned value. We denote $perm$ the function taking a predicate and returning its available permission fraction.
+    Then, we can express the following property:
+    \begin{align*}
+        \left(\texttt{perm(guard($v$))} + \sum_{i=1}^n \texttt{perm(receipt($key_i$, $v$))}\right) \leq 1
+    \end{align*}
+
+\end{definition}
+
+\subsubsection{Choosing the right permission amounts}
+\label{sec:choosing-the-right-permission-amounts}
 
 With this Gobra implementation, the developer is given more responsibility than in the counting permissions model.
 Indeed, upon creating or deleting a versioned value, the developer chooses the permission amount of the \texttt{guard} or \texttt{receipt} that will be consumed.
@@ -210,7 +222,7 @@ Indeed, upon creating or deleting a versioned value, the developer chooses the p
 When creating versioned values, the developer has to choose small enough permission amounts of \texttt{guard} to consume so that all values can be created.
 For example, if they want to create $3$ versioned values, but consume $1/2$ of \texttt{guard} for the two first values, they will not be able to create the third value because they will not have enough permission of \texttt{guard} left.
 This does not affect the soundness of the methodology but simply prevents the developer from implementing their goal.
-It is therefore their in their interest to carefully choose permission amounts.
+It is therefore in their interest to carefully choose permission amounts.
 
 When deleting versioned values, the developer has to specify the full permission amount of \texttt{receipt} to consume.
 Indeed, in Gobra, we currently cannot know how much permission of \texttt{receipt} is available in the current context.
@@ -219,6 +231,18 @@ However, they could specify a smaller amount than the amount they have, and the 
 However, by doing so, the developer will never be able to retrieve the full \texttt{guard} permission, which will prevent them from incrementing the version of the session.
 Again, the methodology's soundness remains unaffected, the only consequence is the developer's inability to realize their objective.
 It is therefore in their interest to specify the full \texttt{receipt} permission amount upon deletion.
+The following definition expresses this property:
+
+\begin{definition}\label{def:sum-perm-eq-1}
+
+    We consider the same notations as in Definition \ref{def:sum-perm-leq-1}.
+    Additionally, we assume the developer always deletes a versioned value specifying the same permission amount as the one they used to create it.
+    Then, we can express the following property:
+    \begin{align*}
+        \left(\texttt{perm(guard($v$))} + \sum_{i=1}^n \texttt{perm(receipt($key_i$, $v$))}\right) = 1
+    \end{align*}
+
+\end{definition}
 
 At the end of the day, we have identified a satisfactory approach for achieving functionality reminiscent of counting permissions in Gobra. Despite placing additional responsibility on the developer, this method is sound and constitutes the core of our deletion mechanism.
 
@@ -300,7 +324,7 @@ Therefore, when the developer chooses $0$ for the \texttt{versionPerm} argument 
 \label{sec:versioned-nonce}
 
 In this second case, the developer chooses a strictly positive \texttt{versionPerm} value.
-This value is used to specify the amount of permission of \texttt{guard} to consume (line 5), as discussed in section \ref{sec:developer-interest}.
+This value is used to specify the amount of permission of \texttt{guard} to consume (line 5), as discussed in section \ref{sec:choosing-the-right-permission-amounts}.
 Additionally, the library owner must be a session identifier (line 6) and not a participant, because a version identifier $(p,s,v)$ requires a session $s$ to be defined.
 Finally, the nonce label must flow to the library owner \emph{at the current version} (lines 7-8).
 This is to ensure that the created nonce is readable at least in the current context.
@@ -316,7 +340,7 @@ Mainly because of the negation, the problem is that such a condition is not triv
 Therefore, we decided to not enforce this condition, as it is not necessary to ensure the soundness of the methodology.
 If the developer “accidentally” creates a nonce with an unversioned label, but using strictly positive \texttt{versionPerm} (meant to be used for versioned values), they will not be prevented from doing so.
 However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:conversion-function} that another way is possible).
-Either way, this will just result in too tight constraints, but but does not call into question the soundness of the deletion mechanism.
+Either way, this will just result in too tight constraints but does not call into question the soundness of the deletion mechanism.
 
 Finally, the postcondition (lines 9-10) states that the developer will receive the same amount of (strictly positive) permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was discussed in section \ref{sec:counting-permissions-idea}.
 
@@ -344,7 +368,7 @@ This function behaves like the opposite of the \texttt{CreateNonce} function in 
 It takes a strictly positive \texttt{versionPerm} argument, which is used to specify the amount of permission of \texttt{receipt} to consume (line 2).
 This same amount of permission of \texttt{guard} is returned (line 4) when no error has occurred during the deletion process.
 Recall that the \texttt{DeleteSafely} function does not check that the given \texttt{receipt} permission amount for this value is the full amount of permission available.
-But as discussed in section \ref{sec:developer-interest}, it is in the developer's interest to specify the full amount if they want verification to succeed.
+But as discussed in section \ref{sec:choosing-the-right-permission-amounts}, it is in the developer's interest to specify the full amount if they want verification to succeed.
 Additionally, \texttt{DeleteSafely} consumes the memory predicate of the deleted value (line 3), expressing that the value is no longer stored in memory.
 
 To securely erase the value from memory, we used the following implementation:
@@ -432,6 +456,15 @@ requires acc(guardNext(l.Version() + 1), versionPerm)
 \end{gobra}
 
 Using this simple adaptation, we can rely on the fact that at any time, the existing \texttt{guard} predicate has the current version for argument.
+This is expressed in the following definition:
+
+\begin{definition}\label{def:unique-version}
+    $\forall v \in \mathbb{N}$, there can only be a unique version $v$ such that
+    \begin{align*}
+        \texttt{perm}(\texttt{guard}(v)) > 0
+    \end{align*}
+
+\end{definition}
 
 \subsection{Encryption and decryption of versioned values}
 
@@ -501,7 +534,7 @@ In this case, this is the only modification to the original implementation of th
 Because the decryption key is unversioned, the resulting plaintext is necessarily also unversioned, which justifies that the deletion methodology does not apply in this case.
 
 If the developer chooses a strictly positive \texttt{versionPerm} value, the decryption key is meant to be versioned. 
-As explained before, we do not enforce the verification that the decryption key is versioned. In a similar manner as in section \ref{sec:developer-interest}, we can prove that this does not impact soundness and it is in the developer's interest to use a versioned decryption key in this case.
+As explained before, we do not enforce the verification that the decryption key is versioned. In a similar manner as in section \ref{sec:choosing-the-right-permission-amounts}, we can prove that this does not impact soundness and it is in the developer's interest to use a versioned decryption key in this case.
 We then consume a partial permission of \texttt{guard} (line 6) and return the same amount of permission of \texttt{receipt} (lines 9-10).
 Additionally, the library owner must be a session identifier (line 7) for versions to make sense.
 Then, if the decryption process succeeds, the resulting plaintext is returned and a memory predicate is issued (line 8), expressing that it is now stored in memory.
@@ -554,7 +587,12 @@ func (l* LabeledLibrary) BumpVersion(nextPerm perm) {
     \label{lst:bump-version}
 \end{figure}
 
-As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1.
+As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1. The following definition expresses this property:
+
+\begin{definition}\label{def:}
+    Assuming there exists $v \in \mathbb{N}$ such that $\texttt{perm}(\texttt{guard}(v)) = 1$. Then $v$ is the current session's version, and no $v$-versioned value exists in memory.
+    Reciprocally, if $v$ is the current session's version and no $v$-versioned value exists in memory, then $\texttt{perm}(\texttt{guard}(v)) = 1$.
+\end{definition}
 
 Additionally, we have seen in section \ref{sec:creating-values-with-multiple-versions-for-ratcheting} that when allowed by their secrecy label, $v$-versioned values can be converted to version $v+1$, which consumes a partial permission of the \texttt{guardNext(v+1)} predicate.
 This means that before incrementing the session's version, the developer has some amount of permission of \texttt{guardNext(v+1)} that may vary between $0$ and $1$.
@@ -569,13 +607,13 @@ We have partial permission to \texttt{guard(v+1)}, and we still may have some re
 As those receipts are for version $v+1$, we could delete them to obtain full permission to \texttt{guard(v+1)}.
 In parallel, permissions to \texttt{guard(v+1)} and \texttt{guardNext(v+2)} allow us to create and convert new values, exactly like before.
 
-Note that similarly to section \ref{sec:developer-interest}, it is in the developer's interest to specify in \texttt{nextPerm} the full amount of permission of \texttt{guardNext(v+1)} that they have. If they provide a lower amount, the function call to \texttt{BumpVersion} will still succeed, but they will not be able to retrieve the full \texttt{guard(v+1)} permission afterward, which will prevent them from incrementing the session's version to $v+2$.
+Note that similarly to section \ref{sec:choosing-the-right-permission-amounts}, it is in the developer's interest to specify in \texttt{nextPerm} the full amount of permission of \texttt{guardNext(v+1)} that they have. If they provide a lower amount, the function call to \texttt{BumpVersion} will still succeed, but they will not be able to retrieve the full \texttt{guard(v+1)} permission afterward, which will prevent them from incrementing the session's version to $v+2$.
 
 
-\todo{How to present this as the summary of the whole section?}
 In summary, we have seen how we adapted the Reusable Verification Library to support versioned values, and how the implemented mechanism enforces the deletion of those values at the end of their time frame.
 While the end result is functional and sound, we have come across various challenges that we had to solve by complexifying the methodology a bit.
 In the next section, we will give a glimpse into an alternative approach to implementing the deletion mechanism more simply, if our verifier, Gobra, had supported \emph{obligations}.
+\todo{How to present this as the summary of the whole section?}
 
 \section{Alternative design using obligations}
 
