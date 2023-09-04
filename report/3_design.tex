@@ -8,10 +8,14 @@
 
 \chapter{Design}
 
-% We want to extend the work of Arquint et al.\ \cite{} to support the safe deletion of old data.
-% Practically, we want to extend their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like post-compromise security.
+In this chapter, we explain how we extended the work of Arquint et al.\ \cite{} to express time-sensitive values and to enforce their deletion at the right time.
+Practically, we extended their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like forward secrecy and post-compromise security.
+In the following sections, we will refer to this person as \emph{the developer}, who uses this library to verify a protocol implementation.
 
-% Explain that we will use "the developer" to mention the person who will use the library to verify a protocol implementation
+We start by giving an overview of our goal and the high-level idea of our methodology to achieve it.
+Then, we introduce counting permissions, as the core tool on which our deletion mechanism is based.
+We continue by explaining how we extended the library to support versioned values, and how we implemented our deletion mechanism.
+Finally, we give a brief look into an alternative approach that would have been simpler, but that is not possible in Gobra.
 
 \section{Overview}
 \label{sec:overview}
@@ -403,7 +407,7 @@ Additionally, we have seen in section \ref{sec:versioned-nonce} that creating a 
 This label now allows $K_n$ and $K_{n+1}$ to coexist while the session's version is $v$.
 Then, after the ratcheting step, the developer would want to increment the session's version. The methodology enforces that $K_n$ is deleted before the version increment.
 
-However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which is not what we want.
+However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed\footnote{For the sake of clarity, note that in this and subsequent paragraphs, the notations $v$ and \texttt{v} denote the same variable.}. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which is not what we want.
 
 \subsubsection{Conversion function}
 \label{sec:conversion-function}
