@@ -63,7 +63,7 @@ As shown in Figure \ref{fig:dh-ratchet}, when the initiator sends a message encr
 Typically, the public key $g^{x_1}$ is sent in the associated data of the AEAD encrypted message, so its integrity is protected, but it remains publicly readable so the responder can immediately access it to compute $K_1$.
 
 In the existing methodology and its current implementation, the Reusable Verification Library, the message comes with a ghost \emph{message invariant}. It is a property, part of the trace invariant, about the content of the message used for verification purposes. Upon encrypting the message to send, the initiator has to prove this message invariant, and upon receiving and decrypting the message, the responder can either assume the message invariant or know that corruption has occurred.
-In our case, for the first message sent by the initiator on Figure \ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would contains that $g^{x_1}$ is an exponential with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
+In our case, for the first message sent by the initiator on Figure \ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would contain that $g^{x_1}$ is an exponential with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
 This information can then be used for verification purposes on the responder side, notably to know that $g^{x_1y_0}$ is a Diffie-Hellman shared secret.
 
 However, in our case, it is a problem that the message invariant is obtained only \emph{after} decryption of the message because we would need to know that $g^{x_1y_0}$ is a shared secret \emph{before} decryption to be able to decrypt the message.
@@ -72,19 +72,19 @@ Indeed, the decryption function requires us to prove that $K_1$ is a valid AEAD 
 
 This is why we decided to slightly modify the DH Ratchet protocol to make it verifiable with our existing methodology and library.
 We present our modified protocol in Figure \ref{fig:dh-ratchet-modified}, and our new first communication round (running after the \emph{Noise\_IK} handshake) in Figure \ref{fig:dh-ratchet-modified-first}.
-For the sake of readability, we will now refer in all future parts to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the full protocol that we verify, e.g. the \emph{Noise\_IK} handshake followed by the first communication round and the ratcheting protocol, as the \emph{full protocol}.
+For the sake of readability, we will now refer in all future parts to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, e.g. the \emph{Noise\_IK} handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
 
 \begin{figure}
     \centering
     \includegraphics[width=0.9\textwidth]{figures/DH-ratchet-modified.png}
-    \caption{Diffie-Hellman Ratchet protocol.}
+    \caption{Modified protocol based on the Diffie-Hellman Ratchet.}
     \label{fig:dh-ratchet-modified}
 \end{figure}
 
 \begin{figure}
     \centering
     \includegraphics[width=0.9\textwidth]{figures/DH-ratchet-modified-first.png}
-    \caption{Diffie-Hellman Ratchet protocol.}
+    \caption{First communication round after the handshake.}
     \label{fig:dh-ratchet-modified-first}
 \end{figure}
 \todo{Change the figures \ref{fig:dh-ratchet-modified} and \ref{fig:dh-ratchet-modified-first} to use cleaner ones, and modify the caption to explain the figures more in detail}
@@ -117,11 +117,34 @@ Unlike before, we have to assume that the attacker compromised Alice's $K_n$ key
 At this point, the attacker cannot obtain $K_{n+2}$ because they cannot have access to the new Diffie-Hellman shared secret.
 The protocol is therefore healed and achieves post-compromise security.
 
-In the end, we have presented a full protocol that draws its security properties from the frequent renewal of ephemeral keys. This protocol is mainly based on the Diffie-Hellman Ratchet protocol and has been slightly adapted to facilitate its verification. 
+In the end, we have presented a full ratcheting protocol that draws its security properties from the frequent renewal of ephemeral keys. This protocol is mainly based on the Diffie-Hellman Ratchet protocol and has been slightly adapted to facilitate its verification. 
 We will now present how we implemented and verified this protocol using our methodology and its implementation in the Reusable Verification Library. 
 
 \section{Implementation and verification}
 \label{sec:implementation-and-verification}
+
+This section explains how we implemented and verified the full ratcheting protocol presented in the previous section.
+We started the implementation on top of the existing WireGuard implementation, which already implements the \emph{Noise\_IK} handshake.
+The remaining work was to implement the first communication round, and the ratcheting protocol.
+In particular, the implementation work shed light on additional challenges related to the verification library. This section describes these challenges and how we solved them.
+
+\todo{Write the outline}
+
+\subsection{Ratcheting key derivation function}
+
+\subsection{Usages and message invariants}
+% Requires having introduced the KDF function
+
+\subsection{First and second rounds}
+% Requires having explained the labels and usages of KDF terms
+
+\subsection{Using the deletion mechanism}
+% Requires having explained the labels of KDF terms
+% Requires having explained that the first two rounds differ
+
+\subsection{Verification}
+% What was verified?
+% Depends on the progress of the implementation
 
 \section{Evaluation}
 \label{sec:evaluation}
