@@ -12,7 +12,7 @@ In this chapter, we explain how we extended the work of Arquint et al.\ \cite{} 
 Practically, we extended their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like forward secrecy and post-compromise security.
 In the following sections, we will refer to this person as \emph{the developer}, who uses this library to verify a protocol implementation.
 
-We start by giving an overview of our goal and the high-level idea of our methodology to achieve it.
+We start by giving an overview of our goal and a high-level idea of our methodology to achieve it.
 Then, we introduce counting permissions, as the core tool on which our deletion mechanism is based.
 We continue by explaining how we extended the library to support versioned values, and how we implemented our deletion mechanism.
 Finally, we give a brief look into an alternative approach that would have been simpler, but that is not possible in Gobra.
@@ -31,7 +31,7 @@ Finally, because versions specify that a value should only be able to exist in s
 \label{sec:goal}
 
 We aim to verify protocol implementations that frequently renew their communication keys to provide strong security properties.
-A notable example is the Signal Double Ratchet protocol. To make our point simpler, we consider a simplified version of this protocol, the Diffie-Hellman Ratchet.
+A notable example is the Signal Double Ratchet protocol. To make our point simpler, we consider a simplified protocol on which Signal is based; the Diffie-Hellman Ratchet.
 
 \subsubsection{Diffie-Hellman Ratchet}
 \label{sec:diffie-hellman-ratchet}
@@ -41,7 +41,7 @@ It is presented in Figure \ref{fig:dh-ratchet}.
 
 \begin{figure}
     \centering
-    \includegraphics[width=1.0\textwidth]{figures/DH-ratchet.png}
+    \includegraphics[width=0.9\textwidth]{figures/DH-ratchet.png}
     \caption{Diffie-Hellman Ratchet protocol.}
     \label{fig:dh-ratchet}
 \end{figure}
@@ -482,7 +482,7 @@ This is expressed in the following definition:
 \subsection{Encryption and decryption of versioned values}
 
 In section \ref{sec:creation-of-versioned-values}, we categorized functions that create values as the ones returning full permission to a new memory predicate of the created value.
-Functions that fit into this category, that we have not mentioned yet, are \emph{encryption} and \emph{decryption} functions.
+Functions that fit into this category, which we have not mentioned yet, are \emph{encryption} and \emph{decryption} functions.
 Indeed, encryption functions take (and return) read permission to a plaintext, encrypt it to create a ciphertext, and return full permission on a new memory predicate for the ciphertext.
 Invertly, decryption functions take (and return) read permission to a ciphertext, decrypt it to create a plaintext, and return full permission on a new memory predicate for the plaintext.
 Both functions create a new value that is stored in memory (a ciphertext and a plaintext respectively), we should therefore make sure they are compatible with our deletion methodology.
@@ -559,7 +559,7 @@ They will receive the same amount of permission of \texttt{receipt} for the plai
 But because the plaintext is unversioned and exists in the current version, it means that its secrecy label allows the current session or participant to access it.
 This means that it could be converted to the next version infinitely with the \texttt{ConvertToNextVersion} function, which would allow the value to keep existing in memory despite version increments.
 Although it works, converting this value for each version would be a burden in practice.
-This is why we offer an additional simple function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, that checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5) to “remove” it from the deletion mechanism.
+This is why we offer an additional simple function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, which checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5) to “remove” it from the deletion mechanism.
 
 \begin{figure}
     \begin{gobra}
