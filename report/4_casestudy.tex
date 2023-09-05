@@ -9,6 +9,7 @@ In this chapter, our goal is to show that the library is now able to verify a pr
 \todo{Write the outline}
 
 \section{Choosing a protocol to verify}
+\label{sec:choosing-a-protocol-to-verify}
 
 First, we decide on a protocol to verify.
 We take several criteria into account, that we list here in order of importance.
@@ -19,6 +20,7 @@ And third, we want to derive our protocol from an existing one, to show that our
 \todo{Write the outline}
 
 \subsection{Ratcheting protocols}
+\label{sec:ratcheting-protocols}
 % DH Ratchet, Signal
 
 We have already mentioned the Signal protocol in the previous chapters, which is based on the Double Ratchet algorithm.
@@ -38,6 +40,7 @@ Additionally, we need to provide the initiator with the public key $g^{y_0}$ of 
 We cannot use the DH Ratchet without this prior knowledge, which requires us to add an initial key agreement to the protocol.
 
 \subsection{Initial key agreement}
+\label{sec:initial-key-agreement}
 % X3DH, WireGuard noise's Handshake
 
 Similarly to the Diffie-Hellman Ratchet, the Signal protocol starts with an initial key agreement before running the Double Ratchet algorithm.
@@ -49,11 +52,12 @@ We use the fact that the WireGuard protocol has already been implemented and ver
 WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise\_IK} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
 \todo{Should I mention the security properties of the handshake (strong/weak forward secrecy)?}
 
-Then, it is easy to add a communication round between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.
+Then, it is easy to add a communication round between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.\todo{This is not really a communication “round” because there is just one message, no response.}
 Therefore, if we combine the \emph{Noise\_IK} handshake with this additional communication round, we obtain the prior knowledge required by the DH Ratchet.
 At this point, we have a ratcheting protocol that satisfies the three criteria introduced at the beginning of this section. However, we made an additional modification to simplify the verification process.
 
-\subsection{Our protocol choice}
+\subsection{Chosen protocol}
+\label{sec:chosen-protocol}
 
 As shown in Figure \ref{fig:dh-ratchet}, when the initiator sends a message encrypted by a key $K_1$ to the responder together with its new public key $g^{x_1}$, the responder uses this public key $g^{x_1}$ to compute the shared secret $K_1$ and decrypt the message.
 Typically, the public key $g^{x_1}$ is sent in the associated data of the AEAD encrypted message, so its integrity is protected, but it remains publicly readable so the responder can immediately access it to compute $K_1$.
@@ -87,13 +91,37 @@ For the sake of readability, we will now refer in all future parts to our modifi
 
 The intuition behind the ratcheting protocol is that we replicate the DH Ratchet protocol, but instead of using the just received public key to compute the shared secret used in the message decryption, we use the public key received in the previous message.
 This first requires us to modify the prior knowledge of the participants. Now, in addition to the initial shared secret $K_0$, both participants need to know the other's public key and their private key.
-% Tell that this is the purpose of the updated communication round
-% Explain the other changes in the ratcheting protocol in more detail
-% What are its security guarantees?
+This is the purpose of the new first communication round shown in Figure \ref{fig:dh-ratchet-modified-first}. 
+Like before, the initiator sends its public key $g^{x_0}$ to the responder, authenticated with the symmetric key established by the handshake. But then, the responder replies with its authenticated public key $g^{y_0}$.
 
+Coming back to the ratcheting protocol shown in Figure \ref{fig:dh-ratchet-modified}, when computing the first shared secret $K_1$, the initiator uses its private key $x_0$, whose associated public key $g^{x_0}$ is already known by the responder, from the first communication round.
+This was not the case in the DH Ratchet protocol.
+The first message sent by the initiator to the responder is otherwise the same as in the DH Ratchet protocol and contains the initiator's new authenticated public key $g^{x_1}$ in addition to the encrypted message.
+Upon reception of this message by the responder, instead of using the public key $g^{x_1}$ to compute the shared secret $K_1$, the responder uses the previous public key $g^{x_0}$ received in the first communication round.
+This allows the responder to obtain $K_1$, decrypt the message, and obtain the associated message invariant containing information about the new public key $g^{x_1}$.
+Then, $g^{x_1}$ is used just after by the responder to compute the next shared secret $K_2$, which is used to encrypt the next message sent to the initiator.
+The same observations can be made upon reception of the second message by the initiator, and all subsequent messages. 
+\todo{Depending on how precise the final Figure \ref{fig:dh-ratchet-modified} is, I may need to explain the difference between the first message and the others: we do not delete the unversioned key $K_0$}
 
-% Explain the expected security properties
+Ultimately, this ratcheting protocol is simpler to verify than the DH Ratchet and aims to provide similar security properties.
+Intuitively, forward secrecy still holds because past communication keys are deleted and cryptographically not retrievable from long-term secrets and current communication keys.
+
+Additionally, post-compromise security still holds but with a stronger assumption.
+Recall that post-compromise security \emph{via state} considers that some secret data remains known only by the participants after a compromise.
+With the DH Ratchet protocol, we assumed that the attacker compromised Alice's $K_n$ key (and state) \emph{after} she derived $K_{n+1}$, and this assumption was enough to obtain post-compromise security (section \ref{sec:security-properties}).
+However, this does not hold in this case.
+Suppose we have two participants Alice and Bob communicating, and that an attacker compromises Alice's state at the time when she computed $K_n$ after receiving a message.
+The attacker knows $K_n$, but also Alice's ephemeral private key $x_{n-1}$ and Bob's just-received public key $g^{y_{n-1}}$.
+The attacker can therefore compute $K_{n+1} = \text{KDF}(K_n, g^{x_{n-1}y_{n-1}})$ because it knows all the inputs of the KDF function, which was not the case with the DH Ratchet protocol.
+Unlike before, we have to assume that the attacker compromised Alice's $K_n$ key (and state) after she derived $K_{n+1}$ \emph{and} $K_{n+2}$.
+At this point, the attacker cannot obtain $K_{n+2}$ because they cannot have access to the new Diffie-Hellman shared secret.
+The protocol is therefore healed and achieves post-compromise security.
+
+In the end, we have presented a full protocol that draws its security properties from the frequent renewal of ephemeral keys. This protocol is mainly based on the Diffie-Hellman Ratchet protocol and has been slightly adapted to facilitate its verification. 
+We will now present how we implemented and verified this protocol using our methodology and its implementation in the Reusable Verification Library. 
 
 \section{Implementation and verification}
+\label{sec:implementation-and-verification}
 
 \section{Evaluation}
+\label{sec:evaluation}
