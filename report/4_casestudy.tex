@@ -49,11 +49,11 @@ Additionally, X3DH is specifically designed to work asynchronously when one user
 Because X3DH is a complex protocol that would require significant time to implement and verify, and because we do not necessarily need all of its strong security properties, we are going to use a simpler protocol.
 
 We use the fact that the WireGuard protocol has already been implemented and verified with the Reusable Verification Library.
-WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise\_IK} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
+WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise IKpsk2} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
 \todo{Should I mention the security properties of the handshake (strong/weak forward secrecy)?}
 
 Then, it is easy to add a communication round between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.\todo{This is not really a communication “round” because there is just one message, no response.}
-Therefore, if we combine the \emph{Noise\_IK} handshake with this additional communication round, we obtain the prior knowledge required by the DH Ratchet.
+Therefore, if we combine the IKpsk2 handshake with this additional communication round, we obtain the prior knowledge required by the DH Ratchet.
 At this point, we have a ratcheting protocol that satisfies the three criteria introduced at the beginning of this section. However, we made an additional modification to simplify the verification process.
 
 \subsection{Chosen protocol}
@@ -71,8 +71,8 @@ Indeed, the decryption function requires us to prove that $K_1$ is a valid AEAD 
 \todo{Why don't we obtain the message invariant upon message reception instead of decryption? Could we change the methodology or library to make the DH Ratchet protocol verifiable?}
 
 This is why we decided to slightly modify the DH Ratchet protocol to make it verifiable with our existing methodology and library.
-We present our modified protocol in Figure \ref{fig:dh-ratchet-modified}, and our new first communication round (running after the \emph{Noise\_IK} handshake) in Figure \ref{fig:dh-ratchet-modified-first}.
-For the sake of readability, we will now refer in all future parts to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, e.g. the \emph{Noise\_IK} handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
+We present our modified protocol in Figure \ref{fig:dh-ratchet-modified}, and our new first communication round (running after the IKpsk2 handshake) in Figure \ref{fig:dh-ratchet-modified-first}.
+For the sake of readability, we will now refer in all future parts to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, e.g. the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
 
 \begin{figure}
     \centering
@@ -124,13 +124,72 @@ We will now present how we implemented and verified this protocol using our meth
 \label{sec:implementation-and-verification}
 
 This section explains how we implemented and verified the full ratcheting protocol presented in the previous section.
-We started the implementation on top of the existing WireGuard implementation, which already implements the \emph{Noise\_IK} handshake.
+We started the implementation on top of the existing WireGuard implementation, which already implements the IKpsk2 handshake.
 The remaining work was to implement the first communication round, and the ratcheting protocol.
 In particular, the implementation work shed light on additional challenges related to the verification library. This section describes these challenges and how we solved them.
 
 \todo{Write the outline}
 
-\subsection{Ratcheting key derivation function}
+\subsection{Ratcheting using a key derivation function}
+
+In section \ref{sec:creating-values-with-multiple-versions-for-ratcheting}, we explained how we designed our methodology to support key ratcheting, namely the derivation of a new key, versioned with a later version from the previous one.
+However, note that for now, we have not discussed the concrete specification and implementation of the ratcheting step. In particular, we have not discussed how we could obtain a $(v+1)$-versioned key from a $v$-versioned key.
+This is no coincidence, and we will explain why.
+
+In practice, this ratcheting step is implemented by a key derivation function (KDF), taking the previous key as one of its inputs and returning the new key.
+However, the precise KDF function used and the arguments it takes depend on the protocol. It is therefore not possible to provide a generic implementation of it in the library. This is why we have not discussed its implementation yet.
+For our case study, the KDF function specification is given in Figure \ref{lst:kdf-ratchet}.
+
+\begin{figure}
+    \begin{gobra}
+trusted
+requires versionPerm > 0 && acc(guard(currentVersion), versionPerm)
+ensures  acc(receipt(res, currentVersion), versionPerm)
+func ComputeKDFRatchet(k []byte, dhss []byte, ghost currentVersion
+    uint32, ghost versionPerm perm @*/) (res []byte) {
+    // ...
+}
+    \end{gobra}
+    \caption{Specification of the trusted \texttt{ComputeKDFRatchet} function, taking the previous key \texttt{k} and Diffie-Hellman shared secret \texttt{dhss} as input, and whose body computes the KDF result \texttt{res}. This protocol-specific KDF implementation is not part of the library but is written by the developer as part of the protocol. Preconditions and postconditions that are not relevant to the deletion mechanism have been omitted.}
+    \label{lst:kdf-ratchet}
+\end{figure}
+
+\texttt{ComputeKDFRatchet} is the concrete implementation of our KDF function, and as the underlying KDF computations come from a non-verified library, we have to trust it.
+As with any function creating a versioned value in our methodology, it consumes some permission fraction of \texttt{guard} predicate and returns the same amount of \texttt{receipt} for the created value. This ensures the soundness of our deletion mechanism.
+
+Now, we want to define the secrecy label of the resulting KDF.
+The secrecy label of a term is defined by a function \texttt{GetLabel} of the library. It can return a static label depending on the properties of the term, or a label depending on the arguments of the term when the term is a function of other terms. 
+But first, to define a secrecy label for the KDF output, we need the library to \emph{know about} our KDF. While we defined it in the protocol, the KDF function needs to be specified on a term level in the library. We define it as follows:
+\begin{gobra}
+func KDFRatchet(Term, Term) Term
+\end{gobra}
+We additionally specify some of its properties, like injectivity, through axioms written in the library.
+To then bridge the gap between the protocol and the library definitions, we add in the protocol's \texttt{ComputeKDFRatchet} a postcondition ensuring that the KDF result corresponds to the byte representation of the library's KDF term.
+
+Now that the library knows about our KDF, we can define its secrecy label.
+Intuitively, the only rule about the secrecy of a KDF output is that it is at most as secure as knowing all of its inputs. Indeed, if you know all the inputs of a KDF, you can compute its output.
+However, the KDF output is not necessarily as secure as its inputs. For example, a \emph{hash} function is a particular key derivation function that is generally used to obtain a public output from a secret input. 
+Therefore, the secrecy label of the output of a KDF should be weaker or equal to the intersection of the secrecy labels of its inputs.
+
+In our case, the output term \texttt{newk := KDFRatchet(k, dhss)} can have its secrecy label determined by the labels of the previous key \texttt{k} and the Diffie-Hellman shared secret \texttt{dhss}.
+Considering $v$ the current session's version, because the input key $k$ is not $(v+1)$-versioned, it is easy to see that \texttt{newk} cannot obtain a secrecy label containing $(p,s,v+1)$ from \texttt{k} alone.
+Instead, we show that the \texttt{dhss} term has to be $(v+1)$-versioned, which will then allow us to define the secrecy label of \texttt{newk} as being equal to the one of \texttt{dhss} only.
+
+The shared secret $\texttt{dhss} = g^{xy}$ is obtained by exponentiating the public key $g^y$ of the other participant with our private key $x$.
+As $x$ is our key, we get to define its secrecy label at creation. 
+In our ratcheting protocol, $x$ is meant to be an ephemeral private used to derive the two next shared communication keys $K$ (the one for receiving and the one for sending), as shown in Figure \ref{fig:dh-ratchet-modified}.
+As we want to use $x$ to obtain a shared secret for the next round of communication, we make it readable in version $v+1$. Because any value also needs to be readable in the current version, $x$ is given the label $[(p,s,v),(p,s,v+1)]$, where $p$ and $s$ are the respective participant and session creating $x$.
+From the message invariant, we obtained that $y$ is readable by the other participant $p'$. Because $p$ does not need to know precisely in which session and version $y$ is readable by $p'$, the message invariant only gives us the simplified secrecy label $[(p')]$ for $y$.
+Then, the labeling rules defined in the existing library state that the secrecy label of the shared secret $g^{xy}$ is the junction of $x$ and $y$'s secrecy labels, which is $[(p,s,v),(p,s,v+1),(p')]$.
+
+This $(v+1)$-versioned secrecy label of \texttt{dhss} is exactly what we wanted for our \texttt{newk} term.
+The last remaining work is to define the labeling of our \texttt{KDFRatchet} term in the library. 
+For this, we add a postcondition in the library's \texttt{GetLabel(term Term)} function:
+\begin{gobra}
+ensures forall k, dhss Term ::
+    term == KDFRatchet(k, dhss) ==> term == GetLabel(dhss)
+\end{gobra}
+Therefore, we have adapted our labeling rule and shown that following our ratcheting methodology, we can obtain a $(v+1)$-versioned key from a $v$-versioned key.
 
 \subsection{Usages and message invariants}
 % Requires having introduced the KDF function
