@@ -2,6 +2,7 @@
 
 
 \section{The Gobra verifier}
+\label{sec:the-gobra-verifier}
 
 Gobra is a verifier for programs written in the Go programming language.
 In practice, a user writes a specification of the program, and Gobra verifies that every execution of the program satisfies this specification.
@@ -11,6 +12,7 @@ In this section, we first provide the reader with a brief introduction to the mo
 We then introduce the fractional permission system, which is used to reason about heap memory in the verification of Go programs.
 
 \subsection{Verifying a Go program}
+\label{sec:verifying-a-go-program}
 % - Modularity of the verification, Hoare logic, pre/postconditions
 % - Predicates
 
@@ -45,6 +47,7 @@ A predicate is a parametrized assertion to which we give a name.
 It is defined with the keyword \texttt{pred}. 
 
 \subsection{Permissions}
+\label{sec:permissions}
 % - The fractional permission system must have been introduced in the Background chapter
 
 Gobra can be used to verify programs that manipulate heap memory.
@@ -74,19 +77,91 @@ func multiply(a, b *int) (product int) {
     \label{lst:multiply-example-heap}
 \end{figure}
 
+\todo{Explain somewhere that we also have permissions for predicates}
 
 \section{Verification of protocol implementations}
+\label{sec:verification-of-protocol-implementations}
 
-\subsection{Symbolic Protocol Analysis}
+Verifying a protocol implementation requires more work than verifying the correctness of a simple Go program.
+Indeed, a protocol implementation is a distributed system composed of several participants communicating with each other.
+Additionally, our goal of verifying security properties requires us to introduce sufficient verification specifications to be able to express these properties.
+
+In this section, we introduce the notion of symbolic protocol analysis to present how protocols are usually modeled when verifying their security properties.
+We then present two existing approaches aiming at verifying protocol \emph{implementations}. The second one is the main basis for our work.
+Finally, we discuss the security properties that we aim to verify, and why they cannot be expressed currently.
+
+\todo{Verify if the outline is up to date}
+
+\subsection{Symbolic protocol analysis}
+\label{sec:symbolic-protocol-analysis}
 % - The trace invariant (but not the message invariant)
 
+In symbolic protocol analysis, we analyze a protocol at a higher level of abstraction to verify its behavior in all possible executions.
+We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
+Additionally, we assume that all operations are performed on symbolic \emph{terms} instead of bytes, which is why we abstract concrete bit-strings to terms.
+
+Furthermore, we consider a Dolev-Yao\cite{} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in the participant's state).
+
+A common procedure for modeling protocols in this setting is to consider a \emph{trace}. This trace records the sequence of protocol events in a particular run of the protocol.
+Security properties can be expressed as a logical expression about a trace, and then verified by checking whether it holds for all possible traces of the protocol.
+Automated provers like Tamarin and ProVerif can verify certain security properties for a protocol \emph{model} by analyzing all its possible traces.
+
+When considering the verification of protocol \emph{implementations}, traces can also be used. The overall idea is to extend the implementation with a trace data structure that is used to record protocol operations. In order to reason about the whole protocol (and not a single execution), we define a \emph{trace invariant}. It is a property that every prefix of any trace of the protocol must satisfy.
+Verifying the protocol implementation ultimately consists of proving that each action of a participant or the attacker maintains the trace invariant, and then proving that the invariant implies the intended security properties.
+
+In the following, we will introduce two existing approaches in this verification setting aiming at verifying high-level security properties for protocol \emph{implementations}. These approaches are the main basis for our work.
+
 \subsection{DY*}
+\label{sec:dy-star}
 % - Versions must have been introduced in the DY* chapter of the Background
 % - Explain our notation for secrecy labels [(p,s,v), (p',s',v')]
-% - CanFlow should be introduced in the background
+\todo{CanFlow should be introduced in the background}
+
+DY*\cite{} is a framework for proving security properties about protocol implementations written in the F* programming language.
+Using a particular code structure and a particular way of storing program state, DY* is able to account for some implementation-level specificities.
+
+DY* uses a \emph{global trace} to model the global execution state of the protocol.
+When a protocol participant is taking a protocol step, it first reads its serialized state from the trace, deserializes it, performs the step, and then saves its new serialized state to the trace. This trace is append-only and existing entries cannot be modified or deleted. In addition to state changes, the trace records all operations that are important for proving security properties (nonce generation, sent messages, and corruption).
+% The attacker can perform these operations at any time as well.
+Ultimately, this global trace contains each participant's current and all past states, and provides a global view over the entire distributed system. % such that global properties can be expressed and proven.
+DY* achieves modular reasoning by specifying a trace invariant and verifying that each function modifies the global trace only in ways that maintain the trace invariant. Global security properties can then be proved from this trace invariant.
+
+On the global trace, each state is annotated with a \emph{session state identifier} to indicate to which participant and protocol session it belongs. This models the fact that a participant may be involved in multiple independent protocol sessions simultaneously. The session state identifier includes a \emph{version} that distinguishes between different phases within a protocol session.%, as explained in detail in section \ref*{sec:existing-approach-dy}.
+Each participant's state comprises several values that together constitute the program state of the participant. Each of these values is assigned a \emph{secrecy label}, indicating which participants are allowed to read the value.
+% In DY*, if an attacker corrupts a participant or one of its sessions (possibly with a specific version), they will obtain all values having the corrupted session state identifier as a secrecy label.
+A value can be made accessible to a participant $p$, to only some specific session $s$ of a participant, or even to some specific version $v$ of a session.
+A secrecy label is most often defined as a list of everyone who can access the value. For example, a value with a secrecy label $[(\text{Alice}), (\text{Bob}, 3), (\text{Charlie}, 2, 7)]$ can be accessed by Alice at any time, by Bob in session 3, and by Charlie when his second session is in version 7. We will keep this notation of secrecy labels throughout this thesis.
+Additionally, the secrecy label of a value can also be \emph{Public}, which means that the value is accessible to everyone\footnote{A secrecy label can also be defined from the union or the intersection of secrecy labels, but this will not be the case in this thesis.}.
+
+The version label attributed to each session is used to introduce a notion of temporality. Initially, all session versions are 0 and are incremented at some times to represent new protocol phases.
+A value with a secrecy label $[(p,s,v)]$ can only occur in the specific phase of the protocol when the session $s$ of participant $p$ has version $v$.
+DY* enforces this restriction with a suitable invariant over states. Thus, only data from the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory. Building on this, they are able to prove forward secrecy and post-compromise security for protocols like Signal.
+
+Protocol implementations written in F* and verified with DY* are executable but require a special runtime environment that provides access to the trace. Additionally, the DY* framework is composed of a library, containing protocol-independent parts that only need to be verified once, and can then be reused across different protocols. This significantly reduces the overall verification time.
 
 \subsection{Modular verification of existing implementations}
-% - The Mem predicate must have been introduced in the Background chapter
+\label{sec:modular-verification-of-existing-implementations}
+\todo{The Mem predicate must have been introduced in the Background chapter}
+
+% The DY* framework is limited to verifying protocol implementations written in the functional F* language and makes several assumptions on how implementations are structured and how program state is stored.
+The DY* framework can only verify protocol implementations written in the functional F* language that adhere to certain assumptions about their structure and program state storage.
+% However, there are many existing protocol implementations written in various languages that cannot be verified with this approach.
+However, these assumptions do not hold in general for existing implementations.
+Arquint et al.\cite{} present a methodology for verifying existing heap-manipulating protocol implementations. This methodology is agnostic to the programming language and relies only on standard features present in most separation logic-based verifiers. In the following, we will focus on Go implementations and the Gobra\cite{} verifier.
+
+This methodology is inspired by DY* and also uses a global trace to provide a global view of the entire system.
+% Arbitrary code structure
+To address the issue of arbitrary code structure in existing implementations, the trace is treated as a concurrent data structure. It allows arbitrary interleavings of operations, in a more fine-grained manner than arbitrary interleavings of protocol steps in DY*, which is crucial for soundness in this setting.
+% Program state management
+As existing implementations manage the program state in their unique ways, we cannot assume that they store the state on the trace or rewrite implementations to do so. Instead, \emph{local invariants} are used to relate the program state stored at the local participant level with the global trace invariant.
+The global trace only records a sequence of events corresponding to high-level operations (similar to DY*, except for the state storage entry) that must maintain a trace invariant, which is used to prove global security properties.
+% Ghost
+Unlike DY*, the global trace is a \emph{ghost} data structure for verification-only purposes, which will be erased before compilation. As such, the global trace has no impact on the runtime behavior or performance.
+Verification is based on separation logic, which allows us to reason about heap manipulations. Furthermore, separation logic's resources are used to prove injective agreement, which is to the best of our knowledge not possible with DY*.
+% Building on this, strong security properties can be expressed and proved such as injective agreement, which excludes replay attacks. This was not possible with DY*.
+
+Similarly to DY*, this methodology comes with a library that allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
+
 
 \subsection{Security properties}
 % - Forward secrecy and post-compromise security (via state) must have been introduced before

@@ -15,7 +15,7 @@ In the following sections, we will refer to this person as \emph{the developer},
 
 We start by giving an overview of our goal and a high-level idea of our methodology to achieve it.
 Then, we introduce counting permissions, as the core tool on which our deletion mechanism is based.
-We continue by explaining how we extended the library to support versioned values, and how we implemented our deletion mechanism.
+We continue by explaining how we extended the library to implement our deletion mechanism.
 Finally, we give a brief look into an alternative approach that would have been simpler, but that is not possible in Gobra.
 
 \section{Overview}
@@ -114,7 +114,7 @@ While this problem has already been solved in DY*, we show that their approach i
 
 \subsubsection{Existing approach in DY*}
 \label{sec:existing-approach-in-dy}
-\todo{This may move to the Background chapter}
+\todo{Remove the content that was already explained in section \ref{sec:dy-star}. If the remaining content is too small, move everything to Background.}
 
 In DY*, a participant uses a storage API to store all of its knowledge on the trace.
 In particular, it stores the knowledge of ongoing sessions into an array, composed of each serialized session state.
@@ -175,7 +175,7 @@ The major difference with a simple counter variable is that the developer \emph{
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
 
-Gobra does not use counting permissions and relies only on the fractional permissions model.
+Gobra does not use counting permissions and relies only on the fractional permissions model, which was explained in section \ref{sec:permissions}.
 Recall that in this model, permission shares are valued in $[0,1]\cap\mathbb{Q}$, a share of value $0/1$ means no permission, a share of value $1/1$ means full permission, and any other value means partial permission.
 
 While fully replicating counting permissions from fractional permissions does not seem trivial, we just need to obtain some level of functionality sufficient to implement our deletion mechanism.
