@@ -1,1 +1,101 @@
 \chapter{Background}
+
+
+\section{The Gobra verifier}
+
+Gobra is a verifier for programs written in the Go programming language.
+In practice, a user writes a specification of the program, and Gobra verifies that every execution of the program satisfies this specification.
+The verification is based on the Viper verification infrastructure. It means that the Gobra specification and Go implementation are translated to the Viper intermediate language, which is then verified.
+
+In this section, we first provide the reader with a brief introduction to the modular verification of Go programs using Gobra.
+We then introduce the fractional permission system, which is used to reason about heap memory in the verification of Go programs.
+
+\subsection{Verifying a Go program}
+% - Modularity of the verification, Hoare logic, pre/postconditions
+% - Predicates
+
+The first step in the verification of a Go program is to write a specification of the program, describing its intended behavior.
+To do so, the user writes verification \emph{annotations} on top of their Go implementation.
+These annotations do not interfere with the execution of the program and are only used for verification purposes.
+
+The main types of annotations are \emph{preconditions}, \emph{postconditions} and \emph{assertions}.
+Preconditions and postconditions are used to specify the behavior of functions. Preconditions specify the requirements that must be met before a function is called, and postconditions specify the guarantees that the function provides when it returns.
+The verification of the function is successful when Gobra can prove that the postcondition holds whenever the precondition holds.
+Assertions are used to specify properties of the program in the function body, to help Gobra prove the correctness of the function.
+An example of a function with verification annotations is shown in Figure~\ref{lst:multiply-example}.
+
+\begin{figure}
+    \begin{gobra}
+requires a >= 0 && b >= 0
+ensures  product == a * b
+func multiply(a, b int) (product int) {
+    product = a * b
+    assert product == 0 ==> a == 0 || b == 0
+}
+    \end{gobra}
+    \caption{This function returns the product of two positive integers. On line 1, “\texttt{requires}” specifies the precondition. Here, multiply can only be called with positive integers. On line 2, “\texttt{ensures}” specifies the postcondition. Here, the postcondition states that the product is equal to the product of the two arguments. On line 5, “\texttt{assert}” specifies an assertion. Here, we observe that the product is zero if and only if one of the arguments is zero. In this case, the assertion is not necessary for the verification of the function and is only given as an example.}
+    \label{lst:multiply-example}
+\end{figure}
+
+This approach to verification, called \emph{Hoare logic}, is modular. Indeed, we verify only once the correctness of a function. Then, when this function is called by other functions, we simply assume that it satisfies its specification.
+This greatly improves performance, as it decomposes the verification of a program into the verification of its smaller components.
+
+A second construct supported by Gobra that will be useful in this thesis is the \emph{predicate}.
+A predicate is a parametrized assertion to which we give a name.
+It is defined with the keyword \texttt{pred}. 
+
+\subsection{Permissions}
+% - The fractional permission system must have been introduced in the Background chapter
+
+Gobra can be used to verify programs that manipulate heap memory.
+To do so, it requires a way to specify which heap locations should be accessible to a function.
+Otherwise, if we wanted to guarantee that a function did not modify the heap, we would have to write a postcondition iterating over all heap locations and stating that they are not modified, which would not be efficient.
+Therefore, Gobra uses \emph{separation logic} to reason about heap memory. This introduces the notion of accessibility, shortened to \texttt{acc}, which is used to specify which heap locations are accessible to a function.
+
+By default, a function has no permission to access heap locations.
+To give a function permission to access some location, we specify it with a precondition.
+Gobra uses fractional permissions, which defines a permission as a rational number between $0$ and $1$. 
+A permission of $1$ to a heap location gives full permission, allowing the function to read and write to the location. A strictly positive permission only gives read permission, and a permission of $0$ gives no permission.
+There is only a permission amount of $1$ for each heap location, which enforces that there can be only one writer at a time while allowing multiple readers.
+To illustrate how we can use permissions in Gobra, we show in Figure~\ref{lst:multiply-example-heap} the same example as in Figure~\ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations.
+
+\begin{figure}
+    \begin{gobra}
+requires acc(a, 1/2) && acc(b, 1/2)
+requires *a >= 0 && *b >= 0
+ensures  acc(a, 1/2) && acc(b, 1/2)
+ensures  product == *a * *b
+func multiply(a, b *int) (product int) {
+    product = *a * *b
+    assert product == 0 ==> *a == 0 || *b == 0
+}
+    \end{gobra}
+    \caption{This function returns the product of two positive integers. This is the same example as in Figure \ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3).}
+    \label{lst:multiply-example-heap}
+\end{figure}
+
+
+\section{Verification of protocol implementations}
+
+\subsection{Symbolic Protocol Analysis}
+% - The trace invariant (but not the message invariant)
+
+\subsection{DY*}
+% - Versions must have been introduced in the DY* chapter of the Background
+% - Explain our notation for secrecy labels [(p,s,v), (p',s',v')]
+% - CanFlow should be introduced in the background
+
+\subsection{Modular verification of existing implementations}
+% - The Mem predicate must have been introduced in the Background chapter
+
+\subsection{Security properties}
+% - Forward secrecy and post-compromise security (via state) must have been introduced before
+
+\section{Cryptography}
+\todo{Is this section necessary?}
+
+\subsection{AEAD encryption}
+% - What associated data is 
+
+\subsection{Diffie-Hellman key exchange}
+% - What a DH key exchange is
