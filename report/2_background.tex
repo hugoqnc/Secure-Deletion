@@ -77,8 +77,6 @@ func multiply(a, b *int) (product int) {
     \label{lst:multiply-example-heap}
 \end{figure}
 
-\todo{Explain somewhere that we also have permissions for predicates}
-
 \section{Verification of protocol implementations}
 \label{sec:verification-of-protocol-implementations}
 
@@ -108,6 +106,25 @@ Automated provers like Tamarin and ProVerif can verify certain security properti
 
 When considering the verification of protocol \emph{implementations}, traces can also be used. The overall idea is to extend the implementation with a trace data structure that is used to record protocol operations. In order to reason about the whole protocol (and not a single execution), we define a \emph{trace invariant}. It is a property that every prefix of any trace of the protocol must satisfy.
 Verifying the protocol implementation ultimately consists of proving that each action of a participant or the attacker maintains the trace invariant, and then proving that the invariant implies the intended security properties.
+We detail the security properties that we aim to verify in the next paragraph.
+
+\subsection{Security properties}
+\label{sec:security-properties-def}
+% - Forward secrecy and post-compromise security (via state) must have been introduced before
+
+We have mentioned that using a trace and maintaining a trace invariant should allow us to prove some security properties.
+In particular, we want to prove forward secrecy and post-compromise security for certain protocols. In this subsection, we explain what these properties are and why they are important.
+
+Forward secrecy is a security property expressing how past communications are protected from a future compromise.
+A protocol is forward-secure if compromising the current state of a participant, like a communication key or a long-term secret key, does not compromise past communications, meaning that the attacker cannot decrypt previous messages.
+However, forward secrecy does not protect future communication. The attacker could use the compromised knowledge to impersonate a legitimate participant and read all future communications.
+This is why we also introduce the next property, post-compromise security.
+
+Post-compromise security is a security property expressing how future communications are protected from a past compromise.
+First, notice that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant Alice: other participants would have no guarantee to be in communication with Alice because the attacker could act exactly like her.
+We instead consider the formalized notion of post-compromise \emph{via state} \cite{}:
+a participant can communicate securely with a peer during a session even when long-term keys have been leaked as long as there is some secret data available exclusively to the participants.
+To be able to prove this property, we must be able to prove that a certain state in the past, to which an attacker has gained access, does not contain the secret data on which future communication depends.
 
 In the following, we will introduce two existing approaches in this verification setting aiming at verifying high-level security properties for protocol \emph{implementations}. These approaches are the main basis for our work.
 
@@ -115,7 +132,8 @@ In the following, we will introduce two existing approaches in this verification
 \label{sec:dy-star}
 % - Versions must have been introduced in the DY* chapter of the Background
 % - Explain our notation for secrecy labels [(p,s,v), (p',s',v')]
-\todo{CanFlow should be introduced in the background}
+% - CanFlow should be introduced in the background
+% - Snapshots
 
 DY*\cite{} is a framework for proving security properties about protocol implementations written in the F* programming language.
 Using a particular code structure and a particular way of storing program state, DY* is able to account for some implementation-level specificities.
@@ -135,13 +153,20 @@ Additionally, the secrecy label of a value can also be \emph{Public}, which mean
 
 The version label attributed to each session is used to introduce a notion of temporality. Initially, all session versions are 0 and are incremented at some times to represent new protocol phases.
 A value with a secrecy label $[(p,s,v)]$ can only occur in the specific phase of the protocol when the session $s$ of participant $p$ has version $v$.
-DY* enforces this restriction with a suitable invariant over states. Thus, only data from the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory. Building on this, they are able to prove forward secrecy and post-compromise security for protocols like Signal.
+DY* enforces this restriction with a suitable invariant over states. Thus, only data from the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory.
+These versions can be used to define the period of existence of values with a particularly fine-grained temporality.
+Building on this, they are able to prove forward secrecy and post-compromise security for protocols like Signal.
+
+A hierarchy between secrecy labels is necessary to express some properties. For this, DY* introduces a \texttt{CanFlow(l1,l2)} relation specifying when a less restrictive secrecy label \texttt{l1} can flow to a more restrictive secrecy label \texttt{l2}.
+For example, the label $[(\text{Alice}), (\text{Bob})]$ can flow to the more specific $[(\text{Alice})]$. And the label $[(\text{Alice})]$ can flow to a single version $[(\text{Alice}, 3)]$.
+In particular, the flowing relation allows us to express that a value should be readable in the current context: the value's label should flow to the current participant, session and version.
 
 Protocol implementations written in F* and verified with DY* are executable but require a special runtime environment that provides access to the trace. Additionally, the DY* framework is composed of a library, containing protocol-independent parts that only need to be verified once, and can then be reused across different protocols. This significantly reduces the overall verification time.
 
 \subsection{Modular verification of existing implementations}
 \label{sec:modular-verification-of-existing-implementations}
-\todo{The Mem predicate must have been introduced in the Background chapter}
+% - The Mem predicate must have been introduced in the Background chapter
+% - It does not support versions, which limits the protocols and properties that this approach can verify
 
 % The DY* framework is limited to verifying protocol implementations written in the functional F* language and makes several assumptions on how implementations are structured and how program state is stored.
 The DY* framework can only verify protocol implementations written in the functional F* language that adhere to certain assumptions about their structure and program state storage.
@@ -154,17 +179,28 @@ This methodology is inspired by DY* and also uses a global trace to provide a gl
 To address the issue of arbitrary code structure in existing implementations, the trace is treated as a concurrent data structure. It allows arbitrary interleavings of operations, in a more fine-grained manner than arbitrary interleavings of protocol steps in DY*, which is crucial for soundness in this setting.
 % Program state management
 As existing implementations manage the program state in their unique ways, we cannot assume that they store the state on the trace or rewrite implementations to do so. Instead, \emph{local invariants} are used to relate the program state stored at the local participant level with the global trace invariant.
+% Snapshot
+Because the global trace is a shared structure, each participant maintains its own local \emph{snapshot}, which is a local copy of the global trace. Since the global trace can grow from the actions of other participants, a snapshot is only a prefix of the global trace. 
 The global trace only records a sequence of events corresponding to high-level operations (similar to DY*, except for the state storage entry) that must maintain a trace invariant, which is used to prove global security properties.
 % Ghost
 Unlike DY*, the global trace is a \emph{ghost} data structure for verification-only purposes, which will be erased before compilation. As such, the global trace has no impact on the runtime behavior or performance.
-Verification is based on separation logic, which allows us to reason about heap manipulations. Furthermore, separation logic's resources are used to prove injective agreement, which is to the best of our knowledge not possible with DY*.
-% Building on this, strong security properties can be expressed and proved such as injective agreement, which excludes replay attacks. This was not possible with DY*.
 
 Similarly to DY*, this methodology comes with a library that allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
+Because we are using Gobra, verification is based on separation logic, which allows us to reason about heap manipulations.
+Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
+The \texttt{Mem} predicate is used to abstract over the memory of a byte array and thus specifies permissions to every byte in the array.
+The predicate body is shown below, for illustration purposes only\footnote{The \texttt{Mem} predicate is in fact abstract in the library, meaning that clients of the reusable verification library cannot get direct access to the individual bytes of the array and instead have to perform all operations via corresponding library calls.}:
+\begin{gobra}
+pred Mem(s []byte) {
+    forall i int :: 0 <= i && i < len(s) ==> acc(&s[i])
+}
+\end{gobra}
+Permission to this predicate is then required by all library functions performing operations on the associated byte array.
+Furthermore, separation logic's resources are used to prove injective agreement, which is to the best of our knowledge not possible with DY*.
 
-
-\subsection{Security properties}
-% - Forward secrecy and post-compromise security (via state) must have been introduced before
+Each created value is also assigned a secrecy label, like in DY*, to specify allowed readers.
+However, this methodology does not support versions in secrecy labels.
+Without this fine-grained temporality, it is not possible to prove forward secrecy and post-compromise security for protocols like Signal.
 
 \section{Cryptography}
 \todo{Is this section necessary?}

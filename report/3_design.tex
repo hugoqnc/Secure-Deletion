@@ -282,7 +282,7 @@ Finally, we give a glimpse of an alternative and simpler approach to implement a
 Before we can implement the deletion mechanism in detail, we need a place to store the current version of a protocol session.
 Currently, the library already handles the storage of the current protocol participant and session.
 These are stored in a field called \texttt{owner} that is an identifier, meaning either a participant identifier $(p)$ or a session identifier $(p,s)$, where $p$ is a participant and $s$ is a session.
-This field is used in the concurrent data structure, as a key to a dictionary mapping identifiers to their corresponding snapshot.
+This field is used in the concurrent data structure, as a key to a dictionary mapping identifiers to their corresponding snapshot, where we recall that snapshots are local copies of the global trace.
 Even though a first thought could be to store the version $v$ as part of the \texttt{owner}, in a version identifier $(p,s,v)$, a protocol participant should keep using the same snapshot mapping during a protocol session.
 
 Therefore, we store the current version of a session in a separate field, as an integer.
@@ -317,7 +317,8 @@ func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
     // ...
 }
     \end{gobra}
-    \caption{Implementation of \texttt{CreateNonce} showcasing the changes to support versioned values. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.}
+    \caption{Implementation of \texttt{CreateNonce} showcasing the changes to support versioned values. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.
+    CanFlow represents the flowing relation between secrecy labels, as defined in section \ref{sec:dy-star}, and takes a snapshot of the global trace and the two secrecy labels as arguments.}
     \label{lst:create-nonce}
 \end{figure}
 
