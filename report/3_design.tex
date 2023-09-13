@@ -9,7 +9,7 @@
 
 \chapter{Design}
 
-In this chapter, we explain how we extended the work of Arquint et al.\ \cite{} to express time-sensitive values and to enforce their deletion at the right time.
+In this chapter, we explain how we extended the work of Arquint et al.\ \cite{}, presented in section \ref{sec:modular-verification-of-existing-implementations}, to express time-sensitive values and to enforce their deletion at the right time.
 Practically, we extended their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like forward secrecy and post-compromise security.
 In the following sections, we will refer to this person as \emph{the developer}, who uses this library to verify a protocol implementation.
 
@@ -114,17 +114,12 @@ While this problem has already been solved in DY*, we show that their approach i
 
 \subsubsection{Existing approach in DY*}
 \label{sec:existing-approach-in-dy}
-\todo{Remove the content that was already explained in section \ref{sec:dy-star}. If the remaining content is too small, move everything to Background.}
 
 In DY*, a participant uses a storage API to store all of its knowledge on the trace.
-In particular, it stores the knowledge of ongoing sessions into an array, composed of each serialized session state.
-Each session is given a version number.
-To update some session state, the participant first reads and deserializes the corresponding session state from the array, then modifies it, and finally serializes and stores it back into the array.
-The participant can also update and increment the version number at this point.
-
-Upon serialization and storage of the updated state, an invariant is checking that only values still accessible in the session's version are stored.
-Thus, only data from the current version can be stored, ensuring that neither outdated keys nor future keys are present in memory.
-Building on this, they can prove forward secrecy and post-compromise security for protocols like Signal.
+In particular, recall from section \ref{sec:dy-star} that a participant stores the knowledge of ongoing sessions into an array, composed of each serialized session state, and each session is given a version number.
+Upon updating some session state, the participant can also update and increment the version number of the session.
+An invariant over the state makes sure that only data from the session's version can be stored, ensuring that old keys cannot remain in memory.
+Practically, this means that previous keys are effectively deleted from the state when the session's version is incremented.
 
 However, DY* does not enforce that outdated keys are \emph{securely} deleted from memory. They only show that they are not present in the current scope, but outdated keys are not explicitly zeroed out from memory.
 Moreover, this solution does not apply to existing implementations because their state is not stored on a trace, making it impossible to express such an invariant.

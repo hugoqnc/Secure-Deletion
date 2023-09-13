@@ -1,6 +1,9 @@
 \chapter{Background}
 
-\todo{Introduce this chapter}
+In this chapter, we introduce the reader to the concepts that are necessary to understand the rest of this thesis.
+We start by introducing how code verification works with a particular focus on the Gobra verifier.
+Then, we present existing work on the verification of protocol implementations, which will form the foundation of our work.
+Finally, we explain two important cryptographic concepts that will be used in the protocols that we aim to verify.
 
 \section{The Gobra verifier}
 \label{sec:the-gobra-verifier}
@@ -60,7 +63,7 @@ By default, a function has no permission to access heap locations.
 To give a function permission to access some location, we specify it with a precondition.
 Gobra uses fractional permissions, which defines a permission as a rational number between $0$ and $1$. 
 A permission of $1$ to a heap location gives full permission, allowing the function to read and write to the location. A strictly positive permission only gives read permission, and a permission of $0$ gives no permission.
-There is only a permission amount of $1$ for each heap location, which enforces that there can be only one writer at a time while allowing multiple readers.
+There can only be a total permission amount of $1$ for each heap location, which enforces that there can be only one writer at a time while allowing multiple readers.
 To illustrate how we can use permissions in Gobra, we show in Figure~\ref{lst:multiply-example-heap} the same example as in Figure~\ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations.
 
 \begin{figure}
@@ -86,10 +89,8 @@ Indeed, a protocol implementation is a distributed system composed of several pa
 Additionally, our goal of verifying security properties requires us to introduce sufficient verification specifications to be able to express these properties.
 
 In this section, we introduce the notion of symbolic protocol analysis to present how protocols are usually modeled when verifying their security properties.
-We then present two existing approaches aiming at verifying protocol \emph{implementations}. The second one is the main basis for our work.
-Finally, we discuss the security properties that we aim to verify, and why they cannot be expressed currently.
-
-\todo{Verify if the outline is up to date}
+Next, we discuss the security properties that we aim to verify.
+We then present two existing approaches aiming at verifying protocol \emph{implementations}. These approaches are the main basis for our work.
 
 \subsection{Symbolic protocol analysis}
 \label{sec:symbolic-protocol-analysis}
@@ -97,7 +98,7 @@ Finally, we discuss the security properties that we aim to verify, and why they 
 
 In symbolic protocol analysis, we analyze a protocol at a higher level of abstraction to verify its behavior in all possible executions.
 We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
-Additionally, we assume that all operations are performed on symbolic \emph{terms} instead of bytes, which is why we abstract concrete bit-strings to terms.
+Additionally, we assume that all operations are performed on symbolic \emph{terms} instead of bytes.%, which is why we abstract concrete bit-strings to terms.
 
 Furthermore, we consider a Dolev-Yao\cite{} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in the participant's state).
 
@@ -145,7 +146,7 @@ When a protocol participant is taking a protocol step, it first reads its serial
 Ultimately, this global trace contains each participant's current and all past states, and provides a global view over the entire distributed system. % such that global properties can be expressed and proven.
 DY* achieves modular reasoning by specifying a trace invariant and verifying that each function modifies the global trace only in ways that maintain the trace invariant. Global security properties can then be proved from this trace invariant.
 
-On the global trace, each state is annotated with a \emph{session state identifier} to indicate to which participant and protocol session it belongs. This models the fact that a participant may be involved in multiple independent protocol sessions simultaneously. The session state identifier includes a \emph{version} that distinguishes between different phases within a protocol session.%, as explained in detail in section \ref*{sec:existing-approach-dy}.
+On the global trace, each state is annotated with a \emph{session state identifier} to indicate to which participant and protocol session it belongs. This models the fact that a participant may be involved in multiple independent protocol sessions simultaneously. The session state identifier includes a \emph{version} that distinguishes between different phases within a protocol session.%, as explained in detail in section \ref*{sec:existing-approach-dy}. 
 Each participant's state comprises several values that together constitute the program state of the participant. Each of these values is assigned a \emph{secrecy label}, indicating which participants are allowed to read the value.
 % In DY*, if an attacker corrupts a participant or one of its sessions (possibly with a specific version), they will obtain all values having the corrupted session state identifier as a secrecy label.
 A value can be made accessible to a participant $p$, to only some specific session $s$ of a participant, or even to some specific version $v$ of a session.
@@ -213,10 +214,10 @@ However, the discerning reader can skip this section if he or she is already fam
 In the protocols that we aim to verify and that we will present later, authenticated encryption with associated data (AEAD) plays an important role in the communication between participants.
 AEAD is a symmetric encryption scheme.
 It provides confidentiality, meaning the encrypted message cannot be read by an attacker who does not know the key.
-It also provides authenticity, meaning that an active attacker cannot modify the encrypted message without being detected.
+It also provides authenticity, meaning that an active attacker cannot modify the encrypted message without being detected and that the receiver can verify that the message was sent by the expected sender.
 
 AEAD encryption takes as input a key, a plaintext, and optionally some associated data, and returns a ciphertext.
-While the message is sent encrypted and authenticated, the goal of the associated data is to send in clear some data that is not confidential but that is authenticated.
+While the message is sent encrypted and authenticated, the purpose of the associated data is to send in clear some data that is not confidential but that is authenticated.
 For example, we will in the following use the associated data to send public keys in an authenticated way.
 Then on the receiver side, AEAD decryption takes as input the same key, the ciphertext, the received associated data, and returns the plaintext if decryption succeeds.
 
