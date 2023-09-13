@@ -1,5 +1,6 @@
 \chapter{Background}
 
+\todo{Introduce this chapter}
 
 \section{The Gobra verifier}
 \label{sec:the-gobra-verifier}
@@ -32,7 +33,7 @@ requires a >= 0 && b >= 0
 ensures  product == a * b
 func multiply(a, b int) (product int) {
     product = a * b
-    assert product == 0 ==> a == 0 || b == 0
+    assert product == 0 ==> (a == 0 || b == 0)
 }
     \end{gobra}
     \caption{This function returns the product of two positive integers. On line 1, “\texttt{requires}” specifies the precondition. Here, multiply can only be called with positive integers. On line 2, “\texttt{ensures}” specifies the postcondition. Here, the postcondition states that the product is equal to the product of the two arguments. On line 5, “\texttt{assert}” specifies an assertion. Here, we observe that the product is zero if and only if one of the arguments is zero. In this case, the assertion is not necessary for the verification of the function and is only given as an example.}
@@ -70,7 +71,7 @@ ensures  acc(a, 1/2) && acc(b, 1/2)
 ensures  product == *a * *b
 func multiply(a, b *int) (product int) {
     product = *a * *b
-    assert product == 0 ==> *a == 0 || *b == 0
+    assert product == 0 ==> (*a == 0 || *b == 0)
 }
     \end{gobra}
     \caption{This function returns the product of two positive integers. This is the same example as in Figure \ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3).}
@@ -203,10 +204,28 @@ However, this methodology does not support versions in secrecy labels.
 Without this fine-grained temporality, it is not possible to prove forward secrecy and post-compromise security for protocols like Signal.
 
 \section{Cryptography}
-\todo{Is this section necessary?}
+In this section, we explain two important cryptographic concepts: AEAD encryption and Diffie-Hellmann key exchange.
+These notions will play a major role in the rest of this thesis. 
+However, the discerning reader can skip this section if he or she is already familiar with these basics.
 
 \subsection{AEAD encryption}
 % - What associated data is 
+In the protocols that we aim to verify and that we will present later, authenticated encryption with associated data (AEAD) plays an important role in the communication between participants.
+AEAD is a symmetric encryption scheme.
+It provides confidentiality, meaning the encrypted message cannot be read by an attacker who does not know the key.
+It also provides authenticity, meaning that an active attacker cannot modify the encrypted message without being detected.
+
+AEAD encryption takes as input a key, a plaintext, and optionally some associated data, and returns a ciphertext.
+While the message is sent encrypted and authenticated, the goal of the associated data is to send in clear some data that is not confidential but that is authenticated.
+For example, we will in the following use the associated data to send public keys in an authenticated way.
+Then on the receiver side, AEAD decryption takes as input the same key, the ciphertext, the received associated data, and returns the plaintext if decryption succeeds.
 
 \subsection{Diffie-Hellman key exchange}
 % - What a DH key exchange is
+
+A Diffie-Hellman key exchange is a public-key protocol that allows two participants to agree on a shared secret key over an insecure channel.
+It is based on public key cryptography, which means that each participant has a public key and a secret key.
+In a Diffie-Hellman key exchange, participants Alice and Bob first exchange their public keys over the insecure channel.
+Then, Alice computes a shared secret key by combining her secret key and Bob's public key, and Bob computes the same shared secret key by combining his secret key and Alice's public key.
+
+This key exchange will be extensively used in the protocols that we aim to verify and that we will present later.
