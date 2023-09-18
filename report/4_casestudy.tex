@@ -229,10 +229,11 @@ For example in the case of our ratcheting protocol, we use usages to distinguish
 A usage can initially be defined upon the creation of a value. This is the case when creating a Diffie-Hellman private key.
 But then, similarly to secrecy labels, usages of terms are obtained using a protocol-specific \texttt{GetUsage} function, which can return a usage depending on the arguments of the term when the term is a function of other terms.
 For example, it is in this \texttt{GetUsage} function that we define that the exponentiation of the generator with a key of usage \emph{DH Private Key} has usage \emph{DH Public Key}.
+Similarly, the exponentiation of a key of usage \emph{DH Public Key} with a key of usage \emph{DH Private Key} has usage \emph{DH Shared Secret}.
 
 Coming back to the two types of messages in our ratcheting protocol that we need to distinguish, we use usages to do so.
 Keys used in the first communication round already have a specific usage \texttt{KUsage} that they obtained at the end of the handshake.
-For subsequent ratcheting keys, we extend the \texttt{GetUsage} function to return a specific usage \texttt{KVersUsage} for keys resulting from the \texttt{KDFRatchet(k, dhss)} function, where \texttt{k} is a key of usage \texttt{KUsage} or \texttt{KVersUsage}, and \texttt{dhss} has a Diffie-Hellman shared secret usage.
+For subsequent ratcheting keys, we extend the \texttt{GetUsage} function to return a specific usage \texttt{KVersUsage} for keys resulting from the \texttt{KDFRatchet(k, dhss)} function, where \texttt{k} is a key of usage \texttt{KUsage} or \texttt{KVersUsage}, and \texttt{dhss} has a \emph{DH Shared Secret} usage.
 
 To be even more specific about the implementation, we found that it makes verification much easier to distinguish between messages coming from the initiator and messages coming from the responder, and to use slightly different message invariants for each.
 Usage constraints were the natural way to do so, by defining a usage \texttt{KVersIrUsage} for keys used by the initiator, and a usage \texttt{KVersRiUsage} for keys used by the responder (and similarly defining \texttt{KIrUsage} and \texttt{KRiUsage} for the first communication round).
@@ -333,8 +334,45 @@ The case \texttt{iter == 0} corresponds to the send operation in the first commu
 The case \texttt{iter == 1} corresponds to the second send operation of the initiator, so to the first send operation of the ratcheting protocol. Compared to previously, we additionally need another \texttt{guard(v)} fraction to consume to compute the initial KDF, which returns a \texttt{receipt(newK, v)} fraction. And we delete the previous private key, consuming the \texttt{receipt(privKey, v)} fraction and returning a \texttt{guard(v)} fraction.
 Finally, the case \texttt{iter > 1} is the same as before but with the additional deletion of the previous communication key, consuming the \texttt{receipt(K, v)} fraction and returning an additional \texttt{guard(v)} fraction.
 
-\subsection{Verification}
-\todo{In the end, what was actually verified in our protocol? The result will depend on my progress on the implementation.}
+\subsection{Corruption}
+
+In the existing methodology, an attacker can corrupt a participant and learn all of their secrets.
+The methodology distinguishes between the corruption of a participant, leaking all of their long-term secrets, and the corruption of a session, leaking all of the secrets of the session in addition to the long-term secrets.
+With our extended methodology, we add the case of the corruption of a version, leaking all of the ephemeral secrets of the version in addition to the session secrets and the long-term secrets.
+Corruption is a crucial notion to consider when verifying a protocol, as we need it to express strong security properties reasoning about the attacker's knowledge.
+For example, to define post-compromise security, we have to express that an attacker has obtained knowledge about past secrets, i.e. that corruption has occurred.
+
+In the Reusable Verification Library, corruption is observable upon receiving and decrypting an AEAD encrypted message. 
+Recall from section \ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender.
+To be exact, we either obtain this message invariant, or we do not and we thus learn that the message comes from the attacker.
+In the second case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
+
+Coming back to our ratcheting protocol, we have seen in the previous section that an ephemeral communication key has a secrecy label of the form $[(p,s,v),(p,s,v+1),(p')]$, where $v$ is the current version of session $s$.
+If we learn that the message came from the attacker so that the secrecy label of the communication key flows to \emph{Public}, we learn that either version $(p,s,v)$, or version $(p,s,v+1)$, or participant $p'$ must have been corrupted.
+Indeed, corrupting any of these is the only way for the attacker to obtain the communication key.
+
+In practice, this requires us to add case disjunctions to the verification annotations of our protocol implementation.
+Upon receiving and decrypting a message, we have to consider the case where we receive the message invariant and the case where we know that corruption occurred.
+In the second case, not obtaining the message invariant means that we learn nothing about the associated data of the encrypted message. We do not learn that it is an exponential of the form $g^y$, with a \emph{DH Public Key} usage, where $y$ is a private key readable by the other participant.
+
+This has an impact on other verification annotations of the protocol.
+For example, the receive function can return information about the received public key only when the message invariant is obtained, but not in case of corruption.
+And the subsequent send operation is supposed to compute a shared secret using the received public key, to then derive a new communication key.
+These operations require preconditions that we obtain differently depending on whether we received the message invariant or not.
+In practice, we make the receive function return a boolean parameter \texttt{newCorrupted} to inform the caller whether corruption was observed upon decryption of the received message.
+We additionally introduce a boolean parameter \texttt{corrupted} as input of the receive and send functions, and we use it to express different preconditions, postconditions and lemmas depending on whether corruption was previously observed or not.
+
+This work of integrating corruption in the verification annotations of the protocol implementation proved to be a tricky and time-consuming task.
+In the scope of this thesis, we were not able to fully complete it.
+We discuss in detail in the next section the remaining work to be done to integrate corruption in our implementation, to ultimately verify the strong security properties of our ratcheting protocol.
+
+\section{Future work}
+\label{sec:future-work}
+
+% For example, the receive function can return information about the received public key only when the message invariant is obtained, but not in case of corruption.
+% The subsequent send operation is supposed to compute a shared secret using the received public key, to then derive a new communication key.
+% As explained in section \ref{sec:usages-and-message-invariants}, this shared secret should have a \emph{DH Shared Secret} usage, which requires the received public key to have a \emph{DH Public Key} usage.
+% This is however only the case when the message invariant is obtained and not in case of corruption.
 
 \section{Evaluation}
 \label{sec:evaluation}
