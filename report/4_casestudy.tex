@@ -362,12 +362,37 @@ These operations require preconditions that we obtain differently depending on w
 In practice, we make the receive function return a boolean parameter \texttt{newCorrupted} to inform the caller whether corruption was observed upon decryption of the received message.
 We additionally introduce a boolean parameter \texttt{corrupted} as input of the receive and send functions, and we use it to express different preconditions, postconditions and lemmas depending on whether corruption was previously observed or not.
 
+\todo{Maybe sum up what we have done/implemented/verified yet?}
 This work of integrating corruption in the verification annotations of the protocol implementation proved to be a tricky and time-consuming task.
 In the scope of this thesis, we were not able to fully complete it.
 We discuss in detail in the next section the remaining work to be done to integrate corruption in our implementation, to ultimately verify the strong security properties of our ratcheting protocol.
 
 \section{Future work}
 \label{sec:future-work}
+% Prove CanAeadEncrypt in the corrupted case
+%   Change usage rule for KVers
+%   Handle secrecy label and corruption
+% Prove K convert in the corrupted case
+% Prove security properties
+
+In this section, we detail how one could finish the verification of our ratcheting protocol.
+
+First, we need to satisfy the AEAD encryption requirements in the corrupted case.
+Upon encryption, the current methodology requires us among others to prove that the encryption key has an appropriate usage.
+A usage is defined as “appropriate” for AEAD encryption by the developer in the \texttt{GetUsage} function.
+In our case, the usages \texttt{KVersIrUsage}, \texttt{KVersRiUsage}, \texttt{KVersIrUsage} and \texttt{KVersRiUsage} defined in section \ref{sec:usages-and-message-invariants} are defined as appropriate for AEAD encryption.
+However, in the corrupted case, recall that we do not know the usage of the received associated data, which we expect to be the other participant's public key.
+The current usage rules prevent us from proving that the shared secret obtained from this public key and our private key has a \emph{DH Shared Secret} usage.
+Because of this, we cannot show that the encryption key obtained with \texttt{KDFRatchet} from the previous key and this shared secret has an appropriate usage for AEAD encryption.
+To solve this, we suggest changing the protocol-specific usage rules defined in GetUsage to make the usage of \texttt{KDFRatchet}'s output independent of the usage of its shared secret input.
+Thus, we would be able to prove that the encryption key has an appropriate usage for AEAD encryption in the corrupted case.
+
+Additionally, to satisfy the AEAD encryption preconditions, we have to show that there exists a label that flows to the encryption key and to which the secrecy label of the message flows.
+In the non-corrupted case, we use the secrecy label $[(p,s,v),(p,s,v+1),(p')]$ of the encryption key, to which the message secrecy label $[(p,s),(p')]$ flows.
+In case of corruption, the secrecy label of the encryption key is harder to determine because we know nothing about the received associated data and we cannot assume that it is the other participant's public key.
+We then have to make a disjunction on what the received associated data could be, to compute the secrecy label of the encryption key in each case.
+By doing so, we can show that in all cases, the secrecy label of the encryption key flows to the label of the DH secret key used to compute it, which is $[(p,s,v),(p,s,v+1)]$. As the secrecy label of the message flows to this label, it satisfies the AEAD encryption precondition.
+
 
 % For example, the receive function can return information about the received public key only when the message invariant is obtained, but not in case of corruption.
 % The subsequent send operation is supposed to compute a shared secret using the received public key, to then derive a new communication key.
