@@ -16,28 +16,30 @@ In the following sections, we will refer to this person as \emph{the developer},
 We start by giving an overview of our goal and a high-level idea of our methodology to achieve it.
 Then, we introduce counting permissions, as the core tool on which our deletion mechanism is based.
 We continue by explaining how we extended the library to implement our deletion mechanism.
-Finally, we give a brief look into an alternative approach that would have been simpler, but that is not possible in Gobra.
+Finally, we give a brief look into an alternative approach that would have been simpler, but that is not currently supported by Gobra.
 
 \section{Overview}
 \label{sec:overview}
 
 This section gives an overview to better understand our goal and the high-level idea of our methodology to achieve it.
 With the aim of verifying properties like forward secrecy and post-compromise security for a protocol implementation, we need to model the fact that some ephemeral values should only exist for a limited amount of time.
+Additionally, we need to enforce that these values are deleted before the end of their time frame.
 
-We start by explaining the goal of our methodology by introducing a relevant protocol, the Diffie-Hellman Ratchet, and the security properties we want to prove for it.
-Then, we explain how we introduce a notion of temporality in the methodology, by adding  \emph{versions}, which define fine-grained time frames during which some values are accessible.
+We start by explaining the goal of our methodology by introducing a relevant protocol, the Diffie-Hellman Ratchet, and the security properties we want to prove about it.
+Then, we explain how we introduce a notion of temporality in the methodology, by adding  \emph{versions}, which define fine-grained time frames during which certain values are present in memory.
 Finally, because versions specify that a value should only be able to exist in some time frame, we reason about how to enforce that it is deleted before this time frame ends.
 
 \subsection{Goal}
 \label{sec:goal}
 
 We aim to verify protocol implementations that frequently renew their communication keys to provide strong security properties.
-A notable example is the Signal Double Ratchet protocol. To make our point simpler, we consider a simplified protocol on which Signal is based; the Diffie-Hellman Ratchet.
+A notable example is the Signal Double Ratchet protocol.
+We consider a slightly simpler protocol, on which Signal is based, involving a single ratchet; the Diffie-Hellman Ratchet.
 
 \subsubsection{Diffie-Hellman Ratchet}
 \label{sec:diffie-hellman-ratchet}
 
-The Diffie-Hellman (DH) Ratchet is a continuous key agreement protocol, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with its own key.
+The Diffie-Hellman (DH) Ratchet is a continuous key agreement protocol, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with a new key.
 It is presented in Figure \ref{fig:dh-ratchet}.
 
 \begin{figure}
@@ -49,19 +51,22 @@ It is presented in Figure \ref{fig:dh-ratchet}.
 \todo{Change the figure to use my own protocol figure, and modify the caption to explain the figure more in detail}
 
 The protocol starts with an established communication key $K_0$, mutually shared by both participants.
-The initiator uses the responder's public key and a newly generated secret key to compute a Diffie-Hellman secret. 
-This newly generated secret is then blended with $K_0$, resulting in the derivation of a fresh communication key $K_1$.
+The initiator uses the responder's public key and a newly generated secret key to compute a shared Diffie-Hellman secret.
+This new shared secret and $K_0$ are input to a key derivation function to derive a new communication key $K_1$, which is used to encrypt a payload, i.e. \texttt{MSG\textsubscript{1}}.
 This step of generating a new key from the previous one is called a \emph{ratcheting step}.
-Then, $K_1$ is used to encrypt the message sent to the responder, accompanied by the initiator's new public key.
-The responder can obtain the Diffie-Hellman shared secret and take the same ratcheting step to obtain $K_1$, then use it to decrypt the message.
-This iterative process continues for each message, with the initiator and the responder continuously ratcheting.
+Behind this name, there is the idea of a ratchet, which one could turn in one direction to generate new keys, but that cannot be turned back, meaning that previous keys cannot be derived from the current one.
+Then, $K_1$ is used to encrypt the message sent to the responder, accompanied by the initiator's new DH public key $g^{x_1}$.
+The responder can compute the same Diffie-Hellman shared secret and take the same ratcheting step to obtain $K_1$, then use $K_1$ to decrypt the message.
+This iterative process is repeated for each message, i.e., every payload is encrypted with a different key obtained by ratcheting the previous one.
 
 After this ratcheting process has been performed and has given us a communication key $K_n$, the previous key $K_{n-1}$ is no longer needed and is deleted.
+Deleting the previous key is an essential step for a protocol implementation to achieve forward secrecy, which we explain in the following.
 
 \subsubsection{Security properties}
 \label{sec:security-properties}
-% \todo{This may move to the Background chapter}
-\todo{This section uses the names “Alice” and “Bob” without introducing them.}
+
+The DH Ratchet protocol is designed to provide strong security properties, such as forward secrecy and post-compromise security.
+We define these properties below and explain how the DH Ratchet protocol satisfies them.
 
 \paragraph{Forward secrecy.}
 \label{sec:forward-secrecy}
@@ -76,41 +81,48 @@ Therefore, the DH Ratchet protocol satisfies forward secrecy. This property is e
 \label{sec:post-compromise-security}
 
 Additionally, the DH Ratchet protocol is designed to be \emph{self-healing}, meaning that it should allow communication to resume securely at some point after a compromise. This is the property of post-compromise security.
-Recall that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant, but we instead consider that some secret data remains available exclusively to the participants after the compromise (post-compromise \emph{via state}).
-In the DH Ratchet protocol, we consider that the attacker compromised Alice's $K_n$ communication key \emph{after} she derived the new $K_{n+1}$ key. At this point, the attacker cannot obtain $K_{n+1}$ because they cannot have access to the new Diffie-Hellman shared secret. 
+Recall that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant, but we instead consider that some secret data remains available exclusively to the participants after the compromise (post-compromise \emph{via state} \cite{}).
+In the DH Ratchet protocol, we consider that the attacker compromised Alice's $K_n$ communication key \emph{after} she derived the new $K_{n+1}$ key and deleted the DH private key she used to compute $K_{n+1}$.
+At this point, the attacker cannot obtain $K_{n+1}$ because they cannot have access to the new DH shared secret.
 
 Therefore, all future communication keys are safe from the attacker, so the DH Ratchet protocol satisfies post-compromise security via state.
-Although post-compromise security is not directly related to secure deletion, it requires fine-grained reasoning about the data occurring in a participant's state at a particular point in time.
+Post-compromise security requires that past states do not contain secret data on which future communication depends. This is why it requires fine-grained reasoning about the data occurring in a participant's state at a particular point in time, and secure deletion of old data.
 
-Our methodology to prove these two strong security properties requires a notion of temporality because we have to specify the lapses of time during which certain keys are available. Outside these lapses, keys must not be present in memory because they have either not been generated yet or have already been securely deleted.
+Our methodology to prove these two strong security properties, forward secrecy and post-compromise security, requires a notion of temporality because we have to specify the lapses of time during which certain keys are possibly present in memory. Outside these lapses, keys must not be present in memory because they have either not been generated yet or have already been securely deleted.
 
 \subsection{Versions}
 \label{sec:versions}
 
-In order to introduce a notion of temporality, we introduce a \emph{version} identifier, similarly to what is done in DY*. Each participant's session is given a version field, initially set to $0$, which keeps track of the current version of the protocol.
-Each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers as well. Formally, a version identifier is a triplet identifier of the form $(p, s, v)$, where $p$ is a participant, $s$ is a session, and $v$ is a version.
+To introduce a notion of temporality, we divide the time axis into successive time frames. We number these time frames with integers, starting at $0$, and call them \emph{versions}.
+Similarly to what is done in DY* \cite{}, each participant's session is given a version field, which keeps track of the current version of the protocol.
+At this point, we can uniquely identify a time frame in a protocol session by the triplet $(p, s, v)$, where $p$ is the participant executing the protocol session $s$, and $v$ is the version defining the time frame. We call this triplet a version identifier.
+
+We then use these identifiers to specify the time frames during which certain terms are present in memory.
+Recall that each term, e.g. a key or a nonce, is assigned a secrecy label stating who can access it. While these labels could previously only be defined from participant or session identifiers, we now allow them to be defined from version identifiers $(p, s, v)$ as well.
 
 We distinguish two cases: \emph{versioned} and \emph{unversioned} terms.
-A term is said to be versioned if it is made to be accessible only in one or several specific versions, while it is said to be unversioned if it is made to be accessible by a participant or a session. 
-An unversioned term accessible by some session is therefore accessible by all versions of that session.
+A term is said to be versioned if it is made to be accessible only in one or several specific versions of the current protocol session.
+Conversely, a term is said to be unversioned if it is made to be accessible by the current participant or session, i.e. in all versions of the current protocol session.
+For example, considering the current session $s$ of participant $p$, a term with secrecy label $[(p, s, 0), (p')]$, where $p'$ is any other participant, is versioned because it is only readable in version $0$ of the current session $s$. But a term with secrecy label $[(p)]$ or $[(p, s)]$ is unversioned because it is readable in all versions of the current session $s$.
 Additionally, we define a $i$-versioned term as a versioned term that is accessible in version $i$.
 
 The existing methodology already enforces that unversioned terms can only be accessed by participants or sessions allowed by their secrecy label.
 A key property of our methodology extension is to ensure that versioned terms can only be accessed when the session is in a version allowed by their secrecy label. Intuitively, this means that an ephemeral key, defined as a versioned value, should only be accessible during a limited time frame defined by the versions allowed by its secrecy label.
+The crucial difference of this work compared to the existing methodology is that it allows non-monotonic secrecy labels, i.e. a term being readable now might not be readable in all future timepoints.
 
-On a high level, this requires two kinds of checks.
+On a high level, enforcing the time-limited existence of versioned terms requires two kinds of checks.
 First, we enforce when creating a versioned term that it should be readable in the current version of the protocol.
-Second, we enforce that when increasing the version of a session, all versioned terms that are no longer accessible in the new version are deleted.
-While the first check can be easily implemented similarly to the existing check for unversioned terms, the second check requires more work. Indeed, using Gobra, there is no trivial way to check a condition on \emph{all versioned terms}.
+Second, we enforce that when increasing the version of a session, all versioned terms that are no longer accessible in the new version have been deleted.
+While the first check can be easily implemented similarly to the existing check for unversioned terms, the second check requires more work. Indeed, using Gobra, there is no trivial way to check a condition on all versioned terms that are stored in memory at a particular time point.
 
-This second check is crucial as it will drive the deletion mechanism, and ensure that ephemeral keys are deleted when they are no longer needed. Let us discuss this in more detail.
+This second check is to ensure that ephemeral keys are deleted when they are no longer needed. Let us discuss this in more detail.
 
 \subsection{Enforcing deletion of old data}
 \label{sec:enforcing-deletion-of-old-data}
 
-Before increasing the version of a session, we have to securely delete all versioned terms that are no longer accessible in the new version. By doing so, we more generally ensure that terms are only accessible in the time frames allowed by their secrecy label.
+Before increasing the version of a session, we have to securely delete all versioned terms that are no longer accessible in the new version. By doing so, we more generally ensure that terms are only accessible in the versions allowed by their secrecy label.
 
-While this problem has already been solved in DY*, we show that their approach is not applicable in our case. We then introduce our approach on a high level.
+We discuss next the solution used in DY*. However, this solution is not applicable in our setting, which does not restrict the way implementations store application state. Hence, we afterward present a more generic solution.
 
 \subsubsection{Existing approach in DY*}
 \label{sec:existing-approach-in-dy}
@@ -121,18 +133,20 @@ Upon updating some session state, the participant can also update and increment 
 An invariant over the state makes sure that only data from the session's version can be stored, ensuring that old keys cannot remain in memory.
 Practically, this means that previous keys are effectively deleted from the state when the session's version is incremented.
 
-However, DY* does not enforce that outdated keys are \emph{securely} deleted from memory. They only show that they are not present in the current scope, but outdated keys are not explicitly zeroed out from memory.
-Moreover, this solution does not apply to existing implementations because their state is not stored on a trace, making it impossible to express such an invariant.
+This solution is however not applicable to us because, as explained previously, we do not restrict the way implementations store application state, and we use a ghost trace, removed at runtime, that cannot store program data.
+Because we do not store the program state on the trace, it makes it impossible to express the same invariant over the state as in DY* in our case.
 Furthermore, DY* enforces the invariant over state only at certain time points, namely when the state is stored on the trace, without taking into account the state in-between.
+Finally, it is not sure if DY* enforces that outdated keys are \emph{securely} deleted, meaning explicitly zeroed out from memory.
+In the next part, we present our generic approach to enforce the deletion of old data.
 
 \subsubsection{Our approach}
 \label{sec:our-approach}
 
-As we cannot simply iterate over the full session state to remove outdated keys like in DY*, we present a new approach to enforce that versioned values are deleted before they are no longer accessible.
+As we cannot simply iterate over the full session state to remove outdated keys like in DY*, we present a new approach to ensure that versioned values get safely deleted before their version expires.
 Note that our approach only \emph{extends} the existing approach of Arquint's et al., which means that our modified library can still be used to verify unversioned protocols in the same way as before.
 
 The intuition of the methodology is to let the developer (that is verifying a protocol implementation) choose when to delete a versioned value.
-We allow them to do so by providing a \emph{secure} deletion function that is their only way to delete a value. This secure function takes care of fully erasing the value from memory.
+For this purpose, we provide a \emph{secure} deletion function for which we assume that it erased the value, e.g. by zeroing out the memory and ensuring that this write operation is not optimized away by the compiler.
 The crucial aspect now is to verify that, before the session version is incremented, the secure deletion function has been called for all versioned values that will no longer be accessible in the new version.
 
 Intuitively, we could solve this problem with a counter. Starting with version $i$, we use the counter $c_i:=0$.
@@ -140,12 +154,11 @@ Each time we create a versioned value readable in version $0$, we increment the 
 And each time we delete a versioned value readable in version $0$, we decrement the counter $c_i = c_i - 1$.
 When we increment the version of the session, we check that $c_i = 0$, meaning that all versioned values readable in version $i$ have been deleted.
 
-With this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
-
 However, this approach cannot be trivially implemented in our case because we cannot just use a counter \emph{variable} that the developer could access at will: they would just have to manually set it to $0$ before incrementing the version of the session, and the counter check would be meaningless.
-% Additionally, this simplified approach has several limitations, which will be discussed case by case in section \ref{sec:}.
+We would have to ensure that the developer cannot directly manipulate the counter, which may be difficult to achieve.
+Instead, to solve this problem without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
 
-To solve this problem without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
+Note that with this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
 \section{Counting permissions}
 \label{sec:counting-permissions}

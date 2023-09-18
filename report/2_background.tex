@@ -141,7 +141,12 @@ DY*\cite{} is a framework for proving security properties about protocol impleme
 Using a particular code structure and a particular way of storing program state, DY* is able to account for some implementation-level specificities.
 
 DY* uses a \emph{global trace} to model the global execution state of the protocol.
-When a protocol participant is taking a protocol step, it first reads its serialized state from the trace, deserializes it, performs the step, and then saves its new serialized state to the trace. This trace is append-only and existing entries cannot be modified or deleted. In addition to state changes, the trace records all operations that are important for proving security properties (nonce generation, sent messages, and corruption).
+When a protocol participant is taking a protocol step, it first reads its serialized state from the trace, deserializes it, performs the step, and then saves its new serialized state to the trace.
+This means that only protocols with this particular way of storing program state can be verified with DY*.
+Note that because the global trace is storing program state, it is part of the protocol implementation and not only a verification artifact: we say that it is a \emph{non-ghost} data structure.
+This also affects the runtime behavior of the protocol, as the trace must exist and be used to store and retrieve the program state.
+
+This trace is append-only and existing entries cannot be modified or deleted. In addition to state changes, the trace records all operations that are important for proving security properties (nonce generation, sent messages, and corruption).
 % The attacker can perform these operations at any time as well.
 Ultimately, this global trace contains each participant's current and all past states, and provides a global view over the entire distributed system. % such that global properties can be expressed and proven.
 DY* achieves modular reasoning by specifying a trace invariant and verifying that each function modifies the global trace only in ways that maintain the trace invariant. Global security properties can then be proved from this trace invariant.
