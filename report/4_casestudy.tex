@@ -2,6 +2,7 @@
 % - The trace invariant (but not the message invariant)
 
 \chapter{Case study}
+\label{chap:case-study}
 
 Now that we have presented our methodology and its implementation in the Reusable Verification Library, we will apply it to a protocol to showcase its use. 
 In this chapter, our goal is to show that the library is now able to verify a protocol whose security properties rely on the frequent deletion of sensitive data.
@@ -124,6 +125,7 @@ This means that after $p'$ creates $y$, they will first send a message where $g^
 Because of this, $y$ still exists in the memory of $p'$ when they compute $K_n$ to encrypt the second message, whereas in the DH Ratchet protocol, $y$ would already be deleted and $K_n$ would be derived using a freshly generated private key.
 \todo{This is not the case in the current figure showing the DH Ratchet. It should be changed to show the deletion of $x$ and $y$ in the receive function.}
 In the end, our ratcheting protocol gives a slightly longer amount of time to the attacker to corrupt $p'$ to obtain $y$ before $K_n$ is computed, which would compromise all future communication.
+\todo{Is our protocol really weaker than the original?}
 % Our ratcheting protocol therefore verifies post-compromise security with a marginally weaker security property than the DH Ratchet protocol.
 
 % Recall that post-compromise security \emph{via state} considers that some secret data remains known only by the participants after a compromise.
@@ -367,8 +369,8 @@ This work of integrating corruption in the verification annotations of the proto
 In the scope of this thesis, we were not able to fully complete it.
 We discuss in detail in the next section the remaining work to be done to integrate corruption in our implementation, to ultimately verify the strong security properties of our ratcheting protocol.
 
-\section{Future work}
-\label{sec:future-work}
+\section{Remaining work}
+\label{sec:remaining-work}
 % Prove CanAeadEncrypt in the corrupted case
 %   Change usage rule for KVers
 %   Handle secrecy label and corruption
@@ -376,6 +378,7 @@ We discuss in detail in the next section the remaining work to be done to integr
 % Prove security properties
 
 In this section, we detail how one could finish the verification of our ratcheting protocol.
+\todo{Write a better intro}
 
 First, we need to satisfy the AEAD encryption requirements in the corrupted case.
 Upon encryption, the current methodology requires us among others to prove that the encryption key has an appropriate usage.
@@ -387,17 +390,21 @@ Because of this, we cannot show that the encryption key obtained with \texttt{KD
 To solve this, we suggest changing the protocol-specific usage rules defined in GetUsage to make the usage of \texttt{KDFRatchet}'s output independent of the usage of its shared secret input.
 Thus, we would be able to prove that the encryption key has an appropriate usage for AEAD encryption in the corrupted case.
 
-Additionally, to satisfy the AEAD encryption preconditions, we have to show that there exists a label that flows to the encryption key and to which the secrecy label of the message flows.
+To satisfy the AEAD encryption preconditions, we additionally have to show that there exists a label that flows to the encryption key and to which the secrecy label of the message flows.
 In the non-corrupted case, we use the secrecy label $[(p,s,v),(p,s,v+1),(p')]$ of the encryption key, to which the message secrecy label $[(p,s),(p')]$ flows.
 In case of corruption, the secrecy label of the encryption key is harder to determine because we know nothing about the received associated data and we cannot assume that it is the other participant's public key.
 We then have to make a disjunction on what the received associated data could be, to compute the secrecy label of the encryption key in each case.
 By doing so, we can show that in all cases, the secrecy label of the encryption key flows to the label of the DH secret key used to compute it, which is $[(p,s,v),(p,s,v+1)]$. As the secrecy label of the message flows to this label, it satisfies the AEAD encryption precondition.
 
+Overall, verifying our protocol implementation in case of corruption will require us to make several case disjunctions and to write additional lemmas to handle each specific proof.
+It is a time-consuming task but we are confident that it is completely doable.
 
-% For example, the receive function can return information about the received public key only when the message invariant is obtained, but not in case of corruption.
-% The subsequent send operation is supposed to compute a shared secret using the received public key, to then derive a new communication key.
-% As explained in section \ref{sec:usages-and-message-invariants}, this shared secret should have a \emph{DH Shared Secret} usage, which requires the received public key to have a \emph{DH Public Key} usage.
-% This is however only the case when the message invariant is obtained and not in case of corruption.
+Next, the last part of the verification work is to prove the security properties of our ratcheting protocol.
+All the verification annotations that we have introduced before, which model concepts like versions and corruption, were added to be able to express security properties.
+\todo{Explain how we can express security properties using versions}
+% Similarly to how DY* verifies forward secrecy and post-compromise security for the Signal protocol, we could express these two properties as a single one.
 
-\section{Evaluation}
-\label{sec:evaluation}
+
+% Suppose a participant $p$ executes the ratcheting protocol in session $s$ with a peer participant $p'$, and suppose that $s$ stores a communication key $K_{n+1}$ in the current version $v$.
+% There must exist a previous version $v'<v$ when $K_n$ was stored in $s$ but $K_{n+1}$ remained secret, unless either $K_n$ becomes public before the session's version reaches $v$ or 
+

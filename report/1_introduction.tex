@@ -1,1 +1,60 @@
 \chapter{Introduction}
+\label{chap:introduction}
+
+% 1. Security protocols are ubiquitous (everywhere)
+% 2. Protocols and their implementation should be correct because high stakes are at risk (banking)
+% 3. We need to guarantee security properties: it is not easy (worst case, infinity of executions)
+% 4. Lots of research on protocol verification, but we also need guarantees for implementations
+% 5. While [authors + citation] propose a promising methodology for verifying security properties for protocol implementations, they cannot reason about sensitive data that must be deleted in a timely manner. This is crucial for proving strong security properties such as post-compromise security.
+
+Security protocols are omnipresent in our daily lives, they are the foundation for many applications ranging from online banking to text messaging. These protocols employ cryptography to achieve fundamental security properties such as authentication and confidentiality.
+Online banking operations serve as a prime example of how heavily we rely on security protocols. A breach in the security of these protocols could lead to substantial financial losses, which is why it is essential that these protocols and their implementations are both correct and secure.
+% For example, proving a property such as \emph{injective agreement} protects against replay attacks and prevents a transaction from being repeated multiple times.
+For example, proving a property such as \emph{injective agreement} protects against replay attacks, meaning that the protocol participants reject messages from an attacker attempting to resend messages they may have obtained in the past. In our online banking example, such a message could contain the request to perform a certain transaction, and it is thus crucial that this request cannot be replayed by an attacker.
+
+Moreover, security protocols are not limited to the banking sector and are now crucial to a wider audience, especially for secure message communication. 
+Secure messaging is a cornerstone of modern communication, with individuals, businesses, and governments relying on it to protect sensitive information.
+Robust security protocols are paramount in safeguarding the confidentiality and integrity of messages.
+For instance, a breach in messaging security could lead to the exposure of personal conversations, critical business data, or confidential government communications, potentially resulting in severe consequences.
+Therefore, several popular messaging applications, such as WhatsApp and Facebook Messenger, rely on the Signal protocol \cite{} to offer secure and end-to-end encrypted communication to billions of users.
+
+Guaranteeing the security properties of protocols is a challenging task, especially in the presence of a strong attacker.
+% (developed in section \ref{})
+In order to ensure these properties for all possible protocol executions, verification must consider an arbitrary number of participants and protocol sessions, as well as any possible ordering of protocol steps. Furthermore, protocol security properties are generally not local to a particular participant but global, such as mutual authentication between two parties. This presents an additional challenge for verification as it requires a global view of the protocol execution.
+
+When reasoning about correctness, two aspects of the protocol must be considered: the high-level protocol itself (that we will call \emph{model}), and its implementation. Proving security properties for a protocol model is an active field of research and several promising automatic verifiers have been proposed (like Tamarin \cite{}). However, a verified protocol model does not imply that an implementation is free of security vulnerabilities and achieves the same security properties as its model. This is why we focus on verifying security properties for protocol implementations.
+
+While Arquint and al.\cite{} propose a promising methodology for verifying security properties for protocol implementations, they cannot reason about sensitive data that must be deleted in a timely manner.
+This is a limitation for proving advanced security properties, such as forward secrecy and post-compromise security, for protocols that periodically renew keys, like Signal \cite{}.
+% Forward secrecy guarantees that an attacker cannot compute the session keys of an already established session after learning the long-term secret keys.
+Forward secrecy informally guarantees that past keys remain secret even when newer keys or long-term keys become known to the attacker.
+It is crucial for secure communication, as it ensures that an attacker cannot decrypt past messages even if they manage to compromise a participant later on.
+Post-compromise security informally means that a participant can communicate securely with a peer, even when certain secrets from the past have leaked.
+%even if the peer’s secrets have already been (partly) compromised \cite{}.
+This is sometimes referred to as \emph{healing}, which allows communication to resume securely at some point after a compromise.
+Protocols like Signal achieve both of these properties by using a key rotation scheme within a session, where a communication key is used to generate its successor and is then deleted.
+
+The work of Arquint et al. comes with a Reusable Verification Library that implements protocol-independent components of the methodology to reduce the verification effort per protocol.
+Because their methodology is generic, the Reusable Verification Library can be implemented in a wide variety of programming languages.
+For the scope of this thesis, we will limit ourselves to protocol implementations written in Go, for which the Reusable Verification Library has been implemented.
+
+In this thesis, we extend the methodology for the modular verification of security protocol implementations by Arquint et al. to make it capable of reasoning about sensitive and ephemeral data that must exist only for a limited time before being deleted.
+We present a generic extension of the methodology that allows the verification of any type of protocol implementation using ephemeral data, like Signal, in order to satisfy strong security properties such as forward secrecy and post-compromise security.
+In addition to the methodology, we extend the Go Reusable Verification Library to make it capable of verifying protocol implementations that rely on ephemeral data for their security properties.
+Finally, we evaluate our methodology and our extension of the Go Reusable Verification Library by partly verifying a protocol implementation employing a key rotation scheme to achieve forward secrecy and post-compromise security.
+
+
+\section{Outline}
+\label{sec:outline}
+% Clearly mention that the case study represents the evaluation of our methodology
+
+The remainder of this thesis proceeds as follows.
+
+In Chapter \ref{chap:background}, we introduce the necessary background knowledge for this thesis, including an introduction to the verification of Go programs, a review of existing works aiming at verifying protocol implementations, and explanations of basic cryptography concepts.
+
+In Chapter \ref{chap:design}, we first present the conceptual idea behind our methodology to verify protocol implementations relying on ephemeral data. We then explain how we extended the Go Reusable Verification Library to support our methodology.
+
+In Chapter \ref{chap:case-study}, we present a case study of our methodology on a Signal-like protocol implementation, and explain how we can use the library to verify strong security properties for this implementation.
+
+Finally, in Chapter \ref{chap:conclusion}, we conclude this thesis and discuss our work.
+\todo{If I talk about future work in the conclusion, mention it here.}

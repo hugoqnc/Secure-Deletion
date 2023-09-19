@@ -1,4 +1,5 @@
 \chapter{Background}
+\label{chap:background}
 
 In this chapter, we introduce the reader to the concepts that are necessary to understand the rest of this thesis.
 We start by introducing how code verification works with a particular focus on the Gobra verifier.
@@ -192,7 +193,7 @@ The global trace only records a sequence of events corresponding to high-level o
 % Ghost
 Unlike DY*, the global trace is a \emph{ghost} data structure for verification-only purposes, which will be erased before compilation. As such, the global trace has no impact on the runtime behavior or performance.
 
-Similarly to DY*, this methodology comes with a library that allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
+Similarly to DY*, this methodology comes with a library, called the Reusable Verification Library, that allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
 Because we are using Gobra, verification is based on separation logic, which allows us to reason about heap manipulations.
 Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
 The \texttt{Mem} predicate is used to abstract over the memory of a byte array and thus specifies permissions to every byte in the array.
