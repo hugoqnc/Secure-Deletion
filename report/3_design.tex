@@ -157,42 +157,51 @@ When we increment the version of the session, we check that $c_i = 0$, meaning t
 
 However, this approach cannot be trivially implemented in our case because we cannot just use a counter \emph{variable} that the developer could access at will: they would just have to manually set it to $0$ before incrementing the version of the session, and the counter check would be meaningless.
 We would have to ensure that the developer cannot directly manipulate the counter, which may be difficult to achieve.
-Instead, to solve this problem without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
+Additionally, we want to support concurrency which would require us at least to use an atomic counter or to protect the counter by a lock.
+Instead, to solve these challenges without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
 
 Note that with this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
 \section{Counting permissions}
 \label{sec:counting-permissions}
 
-Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions.
-In this section, we build our method on the same intuition as the approach explained above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
+Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions \cite{}.
+% In this section, we build our method on the same intuition as the approach explained above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
+While counting permissions follow a similar idea as a counter, they overcome the limitations mentioned earlier and are suitable for our use case, i.e., supporting arbitrary representations of application state and supporting concurrency.
 
 We start by introducing the notion of counting permissions.
-Because these permissions are not available in the current version of Gobra, we then explain how we can obtain similar functionality using the existing permission system.
+Because this permission model is not available in the current version of Gobra, we then explain how we can obtain similar functionality using the existing permission system.
 
 \subsection{Introduction}
 \label{sec:counting-permissions-introduction}
 
 Counting permissions are a permission model where permission shares are valued in $\mathbb{Z}\cup\{u\}$, where $u$ represents the identity element of the share addition operation. A share of value $0$ means full permission, a share of value $u$ means no permission, and any other value means partial permission. A non-negative share $n\geq0$ is called a token \emph{factory} and can be split, for any integer $k>0$, into another factory $n+k$ and an equivalent amount of negative token \emph{bundles} of value $-k<0$. A token factory and some amount of token bundles can be summed, and the result is always non-negative (because the subtracted bundle value had to be added to the factory before). 
 
-In practical terms, this means that starting with full permission ($0$) of some predicate one could use it as a counter. It could be incremented by splitting it into a factory~$1$ and a bundle~$-1$. A second increment would create a factory~$2$ and a second bundle~$-1$. Invertly, decrementing the counter could be done by summing the factory~$2$ with a bundle~$-1$, resulting in a factory~$1$.
+In particular terms, counting permissions can be used as a counter: a full permission (0) can be split into a factory $1$ and a bundle $-1$ representing incrementing the counter by one.
+% In practical terms, this means that starting with full permission ($0$) of some predicate one could use it as a counter. It could be incremented by splitting it into a factory~$1$ and a bundle~$-1$.
+A second increment would create a factory~$2$ and a second bundle~$-1$. Invertly, decrementing the counter could be done by summing the factory~$2$ with a bundle~$-1$, resulting in a factory~$1$.
 
-In our use case, using this counting permissions model, we could use a dummy predicate $p_i$, on which we initially have full permission $n:=0$. The library functions that create a versioned term readable in version $i$ would require access to the token factory $n\geq0$ of $p_i$, and would return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure delete function would return a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, he will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on $p_i$.
+We therefore annotate the library functions such that they keep track of the number of versioned values, i.e. increment the counter when creating a new versioned value and decrement the counter when safely deleting such a value.
+Unversioned values do not need to be tracked as they do not have to be safely deleted because they can be present in memory for the entire (remaining) execution of the protocol.
+
+To implement a deletion mechanism using the counting permissions model, we use an abstract predicate that we call \texttt{guard(i int)}, which takes a version number as an argument, and on which we initially have full permission $0$. The library functions that create a versioned term readable in version $i$ require access to the token factory $n\geq0$ of \texttt{guard(i)}, and return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure deletion function returns a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, they will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on \texttt{guard(i)}.
 
 The major difference with a simple counter variable is that the developer \emph{cannot} create a $-1$ token bundle the way they could just decrement the counter variable. They \emph{have to} delete all $i$-versioned terms and cannot circumvent the deletion mechanism.
+\todo{I may transition by saying that counting permissions may not trivially support concurrency, but the approach we introduce next does.}
 
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
 
-Gobra does not use counting permissions and relies only on the fractional permissions model, which was explained in section \ref{sec:permissions}.
+Gobra currently does not support counting permissions but only fractional permissions, which were explained in section \ref{sec:permissions}.
 Recall that in this model, permission shares are valued in $[0,1]\cap\mathbb{Q}$, a share of value $0/1$ means no permission, a share of value $1/1$ means full permission, and any other value means partial permission.
 
-While fully replicating counting permissions from fractional permissions does not seem trivial, we just need to obtain some level of functionality sufficient to implement our deletion mechanism.
+Because fully encoding counting permissions using fractional permissions is not trivial, we instead restrict ourselves to a solution based on fractional permissions that tracks the number of versioned values with the help of our annotated library functions.
+% we just need to obtain some level of functionality sufficient to implement our deletion mechanism.
 
 \subsubsection{Idea}
 \label{sec:counting-permissions-idea}
 
-We introduce below the two abstract predicates that we will use to implement our deletion mechanism.
+We introduce below two abstract predicates that we use to implement our deletion mechanism.
 
 \begin{gobra}
 pred guard(v uint32)
@@ -203,24 +212,36 @@ The \texttt{guard} predicate can be seen as the token factory and is initially g
 The \texttt{receipt} predicate can be seen as a token bundle.
 The idea is for all library functions that create a versioned value \texttt{key} readable in version \texttt{v} to require partial permission to \texttt{guard(v)}, and to return the same amount of permission of \texttt{receipt(key, v)}.
 Then, upon deletion of \texttt{key}, the secure deletion function requires some amount of permission of \texttt{receipt(key, v)} and returns the same amount of permission of \texttt{guard(v)}.
+We illustrate these explanations with the Gobra specification of two basic \texttt{Create} and \texttt{Delete} functions given below.
+Note that in Gobra, a function argument annotated with \texttt{ghost} is an argument for verification purposes only, i.e. it is not part of the program state and is removed at runtime.
+
+\begin{gobra}
+requires acc(guard(version), versionPerm)
+ensures  acc(receipt(key, version), versionPerm)
+func Create(ghost version, ghost versionPerm) (key []byte) {/*...*/}
+
+requires acc(receipt(key, version), versionPerm)
+ensures  acc(guard(version), versionPerm)
+func Delete(key []byte, ghost version, ghost versionPerm) {/*...*/}
+\end{gobra}
 
 In practice, the developer may have to create several \texttt{v}-versioned values and will consume some amount of permission of \texttt{guard(v)} for each of them.
-They will receive the same amount of permission of \texttt{receipt(key, v)} for each of them.
+For each created value, they will receive the same amount of permission of \texttt{receipt(key, v)} as the amount of permission of \texttt{guard(v)} they consumed to create it.
 When they want to increment the version of the session, they will have to delete all \texttt{v}-versioned values and will consume all \texttt{receipt(key, v)} fractional permissions.
-They will receive the same amount of permission of \texttt{guard(v)} for each of them.
+They will receive the same amount of permission of \texttt{guard(v)} as the consumed \texttt{receipt(key, v)} permission for each deleted value.
 Therefore, we know that no versioned value readable in version \texttt{v} remains in memory when we have full permission on \texttt{guard(v)}.
 The following definition expresses this property:
 
 \begin{definition}\label{def:full-guard-no-versioned-value}
-    We denote $perm$ the function taking a predicate and returning its available permission fraction.
+    We denote $\texttt{perm}$ the function taking a predicate and returning its available permission fraction.
     If there exists a $v \in \mathbb{N}$ such that $\texttt{perm}(\texttt{guard}(v)) = 1$, then $v$ is the current session's version, and no $v$-versioned value exists in memory.
-    Reciprocally, if $v$ is the current session's version and no $v$-versioned value exists in memory, then $\texttt{perm}(\texttt{guard}(v)) = 1$.
+    % Reciprocally, if $v$ is the current session's version and no $v$-versioned value exists in memory, then $\texttt{perm}(\texttt{guard}(v)) = 1$.
 \end{definition}
 
 Consequently, we require full permission on \texttt{guard(v)} to call the function that increments the version of the session.
 
 Similarly to counting permissions, the developer cannot bypass the deletion mechanism because he cannot obtain \texttt{guard} or \texttt{receipt} fractional permissions without going through the library functions.
-This is assuming that the developer does not use Gobra's \texttt{inhale} or \texttt{assume} statements to bypass the permission system.
+This is assuming that the developer does not use Gobra's \texttt{inhale} statement to bypass the permission system.
 
 Note that the receipt predicate takes the created byte array \texttt{key} as an argument.
 This is used at deletion to verify that we delete the actual value associated with the receipt, before returning the \texttt{guard(v)} permission fraction. Otherwise, the developer could simply delete arbitrary (unversioned) values to transform some \texttt{receipt(key, v)} permission fraction into a \texttt{guard(v)} permission fraction, and circumvent the guarantee of deletion of versioned values.
