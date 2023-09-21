@@ -353,24 +353,24 @@ For example, to define post-compromise security, we have to express that an atta
 In the Reusable Verification Library, corruption is observable upon receiving and decrypting an AEAD encrypted message. 
 Recall from section \ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender.
 To be exact, we either obtain this message invariant, or we do not and we thus learn that the message comes from the attacker.
-In the second case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
+In the latter case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
 
 Coming back to our ratcheting protocol, we have seen in the previous section that an ephemeral communication key has a secrecy label of the form $[(p,s,v),(p,s,v+1),(p')]$, where $v$ is the current version of session $s$.
 If we learn that the message came from the attacker so that the secrecy label of the communication key flows to \emph{Public}, we learn that either version $(p,s,v)$, or version $(p,s,v+1)$, or participant $p'$ must have been corrupted.
 Indeed, corrupting any of these is the only way for the attacker to obtain the communication key.
 
-In practice, this requires us to add case disjunctions to the verification annotations of our protocol implementation.
+In practice, this requires us to add case disjunctions in the verification annotations of our protocol implementation.
 Upon receiving and decrypting a message, we have to consider the case where we receive the message invariant and the case where we know that corruption occurred.
-In the second case, not obtaining the message invariant means that we learn nothing about the associated data of the encrypted message. We do not learn that it is an exponential of the form $g^y$, with a \emph{DH Public Key} usage, where $y$ is a private key readable by the other participant.
+In the second case, not obtaining the message invariant means that we learn nothing about the associated data of the encrypted message. In our ratcheting protocol, we do not learn that the associated data is an exponential of the form $g^y$, with a \emph{DH Public Key} usage, where $y$ is a private key readable by the other participant.
 
 This has an impact on other verification annotations of the protocol.
 For example, the receive function can return information about the received public key only when the message invariant is obtained, but not in case of corruption.
 And the subsequent send operation is supposed to compute a shared secret using the received public key, to then derive a new communication key.
 These operations require preconditions that we obtain differently depending on whether we received the message invariant or not.
-In practice, we make the receive function return a boolean parameter \texttt{newCorrupted} to inform the caller whether corruption was observed upon decryption of the received message.
+In practice, we make the receive function return a boolean parameter \texttt{newCorrupted} to inform the caller whether corruption was observed upon decryption of the received message or not.
 We additionally introduce a boolean parameter \texttt{corrupted} as input of the receive and send functions, and we use it to express different preconditions, postconditions and lemmas depending on whether corruption was previously observed or not.
 
-\todo{Maybe sum up what we have done/implemented/verified yet?}
+% \todo{Maybe sum up what we have done/implemented/verified yet?}
 This work of integrating corruption in the verification annotations of the protocol implementation proved to be a tricky and time-consuming task.
 In the scope of this thesis, we were not able to fully complete it.
 We discuss in detail in the next section the remaining work to be done to integrate corruption in our implementation, to ultimately verify the strong security properties of our ratcheting protocol.
@@ -384,7 +384,7 @@ We discuss in detail in the next section the remaining work to be done to integr
 % Prove security properties
 
 In this section, we detail how one could finish the verification of our ratcheting protocol.
-\todo{Write a better intro}
+We list the missing parts of the verification work and we provide a clear path to follow to achieve them.
 
 First, we need to satisfy the AEAD encryption requirements in the corrupted case.
 Upon encryption, the current methodology requires us among others to prove that the encryption key has an appropriate usage.
@@ -393,8 +393,8 @@ In our case, the usages \texttt{KVersIrUsage}, \texttt{KVersRiUsage}, \texttt{KV
 However, in the corrupted case, recall that we do not know the usage of the received associated data, which we expect to be the other participant's public key.
 The current usage rules prevent us from proving that the shared secret obtained from this public key and our private key has a \emph{DH Shared Secret} usage.
 Because of this, we cannot show that the encryption key obtained with \texttt{KDFRatchet} from the previous key and this shared secret has an appropriate usage for AEAD encryption.
-To solve this, we suggest changing the protocol-specific usage rules defined in GetUsage to make the usage of \texttt{KDFRatchet}'s output independent of the usage of its shared secret input.
-Thus, we would be able to prove that the encryption key has an appropriate usage for AEAD encryption in the corrupted case.
+To solve this, we suggest changing the protocol-specific usage rules defined in \texttt{GetUsage} to make the usage of \texttt{KDFRatchet}'s output independent of the usage of its shared secret input.
+Thus, we would be able to prove that the encryption key has an appropriate usage for AEAD encryption even in the corrupted case.
 
 To satisfy the AEAD encryption preconditions, we additionally have to show that there exists a label that flows to the encryption key and to which the secrecy label of the message flows.
 In the non-corrupted case, we use the secrecy label $[(p,s,v),(p,s,v+1),(p')]$ of the encryption key, to which the message secrecy label $[(p,s),(p')]$ flows.
@@ -414,7 +414,7 @@ $K_n$ remains secret unless the attacker compromises the version $v$ or $v+1$ of
 However, our secrecy property is currently weaker than it should be, as the secrecy label of $K_n$ contains $p'$, which expresses that $K_n$ can be obtained by the attacker if they compromise $p'$ at any time.
 This property could be strengthened, as we can intuitively see that $K_n$ is also available in only two versions of a session $s'$ of $p'$.
 We leave to future work the task of showing that the secrecy label of $K_n$ can be refined to $[(p,s,v),(p,s,v+1),(p',s',v'),(p',s',v'+1)]$.
-Showing this requires tightening the message invariant that we initially introduce in section \ref{sec:ratcheting-using-a-key-derivation-function}. 
+Showing this requires tightening the message invariant that we initially introduced in section \ref{sec:ratcheting-using-a-key-derivation-function}. 
 
 This means that $K_n$ remains secret even if the attacker compromises a version $v_{corrupted} \in \mathbb{N} \setminus \{v, v+1\}$ of the session $s$ of participant $p$, or a version $v'_{corrupted} \in \mathbb{N} \setminus \{v', v'+1\}$ of the session $s'$ of participant $p'$.
 This secrecy property expresses both forward secrecy and post-compromise security for our ratcheting protocol.

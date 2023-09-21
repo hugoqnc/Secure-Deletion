@@ -1,5 +1,9 @@
 \begin{abstract}
-  This example thesis briefly shows the main features of our thesis
-  style, and how to use it for your purposes.
-  \todo[inline]{Change abstract}
+  Security protocols are crucial for protecting sensitive information and communications in today's digital age. Even a minor flaw in how these protocols are implemented can lead to serious consequences. Formal verification can prevent such flaws by providing security guarantees.
+
+  Arquint et al. propose a generic and modular methodology to verify the security of protocol implementations.
+  We extend their methodology to make it able to reason about ephemeral and sensitive data that must be quickly deleted.
+  This enhancement allows us to verify strong security properties, such as forward secrecy and post-compromise security, for protocols that frequently renew their keys, such as the encrypted messaging protocol Signal.
+  Our contributions encompass a conceptual expansion of their methodology and an extension of their Go library, which provides a way to verify Go protocol implementations relying on ephemeral data.
+  A case study, featuring a Signal-like protocol implementation, showcases the practical application of our methodology.
 \end{abstract}
