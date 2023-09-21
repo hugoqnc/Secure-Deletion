@@ -83,8 +83,8 @@ Therefore, the DH Ratchet protocol satisfies forward secrecy. This property is e
 
 Additionally, the DH Ratchet protocol is designed to be \emph{self-healing}, meaning that it should allow communication to resume securely at some point after a compromise. This is the property of post-compromise security.
 Recall that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant, but we instead consider that some secret data remains available exclusively to the participants after the compromise (post-compromise \emph{via state} \cite{}).
-In the DH Ratchet protocol, we consider that the attacker compromised Alice's $K_n$ communication key \emph{after} she derived the new $K_{n+1}$ key and deleted the DH private key she used to compute $K_{n+1}$.
-At this point, the attacker cannot obtain $K_{n+1}$ because they cannot have access to the new DH shared secret.
+In the DH Ratchet protocol, we consider that the attacker compromised Alice's $K_n$ communication key \emph{after} she derived the new $K_{n+1}$ key, and after she and her peer Bob have deleted their DH private key they used to compute $K_{n+1}$.
+At this point, the attacker cannot obtain $K_{n+1}$ because they cannot have access to the associated DH shared secret.
 
 Therefore, all future communication keys are safe from the attacker, so the DH Ratchet protocol satisfies post-compromise security via state.
 Post-compromise security requires that past states do not contain secret data on which future communication depends. This is why it requires fine-grained reasoning about the data occurring in a participant's state at a particular point in time, and secure deletion of old data.
