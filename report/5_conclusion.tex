@@ -1,2 +1,37 @@
 \chapter{Conclusion}
 \label{chap:conclusion}
+
+% Recap what we have designed and implemented, and the core idea
+In conclusion, this thesis has successfully extended the methodology developed by Arquint et al. for the modular verification of security protocol implementations.
+To the best of our knowledge, our contributions enable for the first time the verification of strong security properties for real-world protocol implementations relying on the secure deletion of sensitive data, in a wide range of programming languages.
+
+The generic extension we introduced offers a flexible methodology for verifying various protocol implementations that use ephemeral data, such as Signal and its key rotation scheme. Our methodology can be used by verification developers to prove strong security properties like forward secrecy and post-compromise security in their protocol implementations.
+
+Furthermore, our work extended the capabilities of the Go Reusable Verification Library, reflecting our updated methodology.
+Using a solution inspired by counting permissions, we provide the library with the ability to track the sensitive values of a protocol implementation and ensure that they are deleted when they should be.
+By implementing this solution in several of the functions of the library, we facilitate the work of the developer by ensuring in a sound way that the values he creates can only exist during the periods he specifies.
+
+% Explain how the case study shows that our methodology works
+We evaluate our methodology with a case study of a Signal-like protocol implementation, in which we showcase how we can use our methodology and its implementation in the Go library.
+This case study explains how we can apply our methodology and tackles some non-trivial technical concepts such as key ratcheting.
+We conclude this case study by providing a clear path toward verifying forward secrecy and post-compromise security for this protocol implementation.
+
+In the next and final section, we propose some ideas for future work that could improve or extend this work.
+
+\section{Future work}
+\label{sec:future-work}
+% Future work:
+%   - Finish the case study?
+%   - Change AEAD methodology to support verification of the DH Ratchet
+%   - Implement obligations in Gobra
+
+\paragraph{Finishing the case study.}
+The case study presented in chapter \ref{chap:case-study} could be completed by following the path we have outlined in section \ref{sec:remaining-work}, resulting in the verification of forward secrecy and post-compromise security for this protocol implementation.
+
+\paragraph{Adding obligation support to Gobra.}
+As discussed in detail in section \ref{sec:alternative-design-using-obligations}, adding obligations to Gobra could then provide a simpler and more elegant solution to the problem of tracking sensitive values.
+This may result in a more intuitive library that the developer could use with less effort.
+
+\paragraph{Improving how the methodology handles AEAD.}
+When choosing the protocol to verify for our case study, in section \ref{sec:chosen-protocol}, we had to slightly adapt the Diffie-Hellman ratchet protocol to make it more easily verifiable.
+The reason for this is how the current method handles AEAD decryption, and it might hinder our ability to decrypt the message using a key that is derived from the associated data we received.

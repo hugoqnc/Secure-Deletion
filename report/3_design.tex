@@ -657,6 +657,7 @@ In the next section, we will give a glimpse into an alternative approach to impl
 \todo{How to present this as the summary of the whole section?}
 
 \section{Alternative design using obligations}
+\label{sec:alternative-design-using-obligations}
 
 An obligation, defined for a thread, specifies an action to be eventually performed by this thread~\cite{}. An obligation is initially \emph{emitted}, and once the action is performed, the obligation is \emph{discharged}.
 
@@ -665,6 +666,7 @@ Then, as Gobra does not support obligations, we present a way to add them to the
 This section will not be as exhaustive as the description of our deletion mechanism and only aims at giving an intuition of how obligations could be used to implement it.
 
 \subsubsection{Idea}
+\label{sec:obligations-idea}
 
 With a verifier supporting obligations, we could, upon creation of a time-sensitive value, emit an obligation to delete it before the next version increment. 
 In practice, the obligation would be a construct linking the versioned value to its version number.
@@ -675,6 +677,7 @@ This means that “old” obligations, with the previous version number, must ha
 The obligation mechanism would therefore be composed of two main parts: an obligation construct, and a way to check all existing obligations.
 
 \subsubsection{Adding obligations to Gobra}
+\label{sec:adding-obligations-to-gobra}
 
 To add obligations to Gobra, we first need to define the obligation construct.
 It should be parameterized by the value and its version number.
