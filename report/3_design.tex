@@ -350,7 +350,7 @@ Additionally, it is often useful when working with secrecy labels to know the co
 
 It is easy to categorize functions that create values: they all return full permission to a new memory predicate \texttt{Mem} of the created value.
 The library provides three functions to create values: \texttt{CreateNonce} to create some random value, \texttt{GeneratePkeKey} to create a public/private key pair, and \texttt{GenerateDHKey} to create a secret key for Diffie-Hellman key exchange.
-Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this subsection. Its simplified specification is provided in Figure \ref{lst:create-nonce}.
+Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this section. Its simplified specification is provided in Figure \ref{lst:create-nonce}.
 
 \begin{figure}
     \begin{gobra}
@@ -437,7 +437,7 @@ func (l* LabeledLibrary) DeleteSafely(value []byte,
     return
 }
     \end{gobra}
-    \caption{Implementation and simplified specification of \texttt{DeleteSafely}, used to delete a versioned value. Preconditions, postconditions and arguments that are not relevant to the deletion mechanism have been omitted.}
+    \caption{Implementation and specification of \texttt{DeleteSafely}, used to delete a versioned value. Preconditions, postconditions and arguments that are not relevant to the deletion mechanism have been omitted.}
     \label{lst:delete-safely}
 \end{figure}
 
@@ -472,9 +472,9 @@ However, while this label makes $K_{n+1}$ theoretically readable in version $v+1
 To solve this problem, we introduce a generic way to migrate values from one version to the next one if this is permitted by their secrecy labels.
 Intuitively, a versioned value \texttt{key} created in version $v$ has consumed some permission of \texttt{guard(v)} and returned some permission of \texttt{receipt(key, v)}.
 If \texttt{key}'s secrecy label also flows to the next version $v+1$, we want to allow \texttt{key} to continue to exist in version $v+1$.
-To do so, we offer the developer to \emph{convert} \texttt{key}'s receipt to a new \texttt{receipt(key, v+1)}. At the same time, we return the consumed \texttt{guard(v)} permission but consume an equivalent amount of \texttt{guard(v+1)} permission.
-This way, it is \emph{as if} the developer had created \texttt{key} directly in version $v+1$.
-This means that before incrementing the session's version to $v+2$, the deletion methodology will either force the developer to delete \texttt{key} or convert it if its secrecy label allows it.
+To do so, we offer the developer to \emph{convert} \texttt{key}'s receipt to a new \texttt{receipt(key, v+1)}. At the same time, we return the consumed \texttt{guard(v)} permission but consume an equivalent amount of \texttt{guardNext(v+1)} permission, to make the permission amounts behave \emph{as if} the developer had created \texttt{key} directly in version $v+1$.
+Note that we use a different predicate \texttt{guardNext(v+1)}, playing the same role as \texttt{guard(v+1)}, for reasons that will be explained in the next section.
+Ultimately, this means that before incrementing the session's version to $v+2$, the deletion methodology will either force the developer to safely delete \texttt{key} or convert it once more if permitted by its secrecy label.
 
 From this intuition, we can define the \texttt{ConvertToNextVersion} function shown in Figure \ref{lst:convert-to-next-version}.
 Similarly to \texttt{CreateNonce}, the library owner must be a session identifier (line 1) and not a participant. A positive fraction of the existing \texttt{receipt} permission and the next version's \texttt{guard} permission is consumed (lines 2-4). Finally, the secrecy label of the value must flow to the next version (lines 5-6).
@@ -485,7 +485,7 @@ In return, \texttt{ConvertToNextVersion} returns the same amount of permission o
 requires l.Owner().IsSession()
 requires versionPerm > 0
 requires acc(receipt(value, l.Version()), versionPerm)
-requires acc(guard(l.Version() + 1), versionPerm)
+requires acc(guardNext(l.Version() + 1), versionPerm)
 requires CanFlow(l.Snapshot(), GetLabel(valueT),
     Readers(set[p.Id]{l.OwnerWithNextVersion()}))
 ensures  acc(guard(l.Version()), versionPerm)
@@ -497,44 +497,46 @@ func (l* LabeledLibrary) ConvertToNextVersion(value []byte,
     \label{lst:convert-to-next-version}
 \end{figure}
 
-The \texttt{ConvertToNextVersion} function solves our ratcheting problem. While in a protocol session with version $v$, we can obtain a new key $K_{n+1}$ with secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner, from a key $K_n$ versioned with version $v$. At this point, the two keys coexist in version $v$. The developer can then convert $K_{n+1}$ to the next version, meaning that it removes the obligation to delete $K_{n+1}$ when incrementing the session's version $v$ to $v+1$, and sets the obligation to delete $K_{n+1}$ when incrementing the session's version $v+1$ to $v+2$. After this conversion, the developer can delete the old key $K_n$ and has now obtained its full \texttt{guard(v)} permission fraction. They can now increment the session's version to $v+1$.
+The \texttt{ConvertToNextVersion} function solves our ratcheting problem. While in a protocol session with version $v$, we can obtain a new key $K_{n+1}$ with secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner, from a key $K_n$ versioned with version $v$. At this point, the two keys coexist in version $v$.
+The developer can then convert $K_{n+1}$ to the next version, meaning that it replaces the obligation to delete $K_{n+1}$ in version $v$ with an obligation to delete $K_{n+1}$ in version $v+1$.
+After this conversion, the developer can delete the old key $K_n$ and has now obtained full permission to the \texttt{guard(v)} predicate. They can now increment the session's version to $v+1$.
 
 \subsubsection{Handling mutliple guards}
 \label{sec:handling-mutliple-guards}
 
-While the conversion function solves the initial ratcheting problem, it introduces a new challenge: we now have to deal with two \texttt{guard} predicates at the same time, one for the current version and one for the next one.
-Because a session's version is initialized at $0$, it implies giving the developer full permission on both \texttt{guard(0)} and \texttt{guard(1)} predicates when creating a session.
+While the conversion function solves the initial ratcheting problem, it introduces a new challenge: we now have to deal with two \texttt{guard} predicates at the same time. One, \texttt{guard(v)}, for the current version and one, \texttt{guardNext(v+1)} for the next version.
+Otherwise, the conversion function would not be able to consume a fractional amount of the next version's \texttt{guardNext} predicate.
+Because a session's version is initialized at $0$, it implies giving the developer full permission to both \texttt{guard(0)} and \texttt{guardNext(1)} predicates at the beginning of a protocol session.
 
-However, some parts of the implementation of our deletion mechanism rely on the existence of a single \texttt{guard(v)} predicate, where $v$ is necessarily the current version of the session.
+Some parts of the implementation of our deletion mechanism rely on the existence of a single \texttt{guard(v)} predicate, where $v$ is necessarily the current version of the session.
 In particular, some helper functions that play a role in the deletion mechanism do not have access to the session state, so do not know the current version.
-It is then handy to give them access to a \texttt{guard(v)} permission fraction, so they know that $v$ is the current version.
+In these cases, \texttt{guard(v)} can be used to hand them the current version.
+% It is then handy to give them access to a \texttt{guard(v)} permission fraction, so they know that $v$ is the current version.
 % For example, the body of \texttt{CreateNonce} calls a trusted implementation, called \texttt{CreateNonceImpl}, which generates a random nonce and stores it in a byte array.
 % As this implementation is in the library, we want to prevent the developer from calling it with arguments that would compromise the soundness of the methodology.
 % In particular, \texttt{CreateNonceImpl} does not have access to the session state, so it does not know the current version. 
 
-We use a simple trick to keep the assumption that there is only one \texttt{guard} predicate at a time. We define an additional predicate:
+% We use a simple trick to keep the assumption that there is only one \texttt{guard} predicate at a time. We define an additional predicate:
+To prevent developers from accidentally calling these helper functions with the next version instead of the current one, we introduce a distinct predicate:
 \begin{gobra}
 pred guardNext(v uint32)
 \end{gobra}
 
 The \texttt{guardNext} predicate is another abstract predicate, like \texttt{guard}, and is used in our methodology for the same purpose as \texttt{guard}, but for the next version. 
-In practice, it means that we initially give the developer full permission on \texttt{guard(0)} and \texttt{guardNext(1)} predicates when creating a session.
-This also requires us to slightly change the \texttt{ConvertToNextVersion} implementation given in Figure \ref{lst:convert-to-next-version}.
-We replace line 4 with the following:
-\begin{gobra}
-requires acc(guardNext(l.Version() + 1), versionPerm)
-\end{gobra}
+% In practice, it means that we initially give the developer full permission on \texttt{guard(0)} and \texttt{guardNext(1)} predicates when creating a session.
+% This also requires us to slightly change the \texttt{ConvertToNextVersion} implementation given in Figure \ref{lst:convert-to-next-version}.
+% We replace line 4 with the following:
+% \begin{gobra}
+% requires acc(guardNext(l.Version() + 1), versionPerm)
+% \end{gobra}
+Using this simple adaptation, we can rely on the fact that at any time, the existing \texttt{guard} predicate has the current version as argument.
+This is expressed in the following lemma:
 
-Using this simple adaptation, we can rely on the fact that at any time, the existing \texttt{guard} predicate has the current version for argument.
-This is expressed in the following definition:
-
-\begin{definition}\label{def:unique-version}
-    At any time, there can only exist a unique version $v \in \mathbb{N}$ such that
+\begin{lemma}\label{lem:unique-version}
     \begin{align*}
-        \texttt{perm}(\texttt{guard}(v)) > 0
+        \forall v_1, v_2 \in \mathbb{N}, \texttt{perm}(\texttt{guard}(v_1)) > 0 \land \texttt{perm}(\texttt{guard}(v_2)) > 0 \Rightarrow v_1 = v_2
     \end{align*}
-
-\end{definition}
+\end{lemma}
 
 \subsection{Encryption and decryption of versioned values}
 
@@ -546,36 +548,39 @@ Both functions create a new value that is stored in memory (a ciphertext and a p
 
 \subsubsection{Encryption}
 
-Encryption is the simpler case. Indeed, an encryption function creates a \emph{public} ciphertext.
-As this ciphertext is meant to be sent on the network, which the attacker can read, it would not make sense to create a ciphertext with a restrictive secrecy label, let alone a versioned one.
+Encryption is the simpler case. By definition of secrecy labels, an encryption function creates a \emph{public} ciphertext, which is unversioned.
+% As this ciphertext is meant to be sent on the network, which the attacker can read, it would not make sense to create a ciphertext with a restrictive secrecy label, let alone a versioned one.
 Therefore, we do not need to change the encryption function to support versioned values.
 
 \subsubsection{Decryption}
 
-The decryption case requires more work. 
-Indeed, a decryption function creates a plaintext, whose value is the same as the original plaintext used for encryption. 
-Its secrecy label should therefore be the same as the original plaintext's secrecy label.
+% The decryption case requires more work. 
+Since a decryption function creates a plaintext, whose value is the same as the original plaintext used for encryption, the returned plaintext might contain versioned values.
+% Its secrecy label should therefore be the same as the original plaintext's secrecy label.
 
 As a simple example, suppose that a participant creates a versioned value $key$, and then encrypts and decrypts it.
 They will obtain a copy $key_{copy}=key$ of the initial versioned value, with its own memory predicate.
-While the current deletion methodology forces the developer to delete (or convert) the versioned value $key$ before the next version increment, we need to adapt the methodology to decryption functions to also force the deletion of $key_{copy}$.
+While the current deletion methodology forces the developer to delete (or convert) the versioned value $key$ before the next version increment, we need to adapt the methodology to decryption functions to also enforce the deletion of $key_{copy}$.
 
 Intuitively, we want to treat the decryption function like a creation function and consume some permission of \texttt{guard} only when the created plaintext is versioned.
-However, as the decrypted plaintext is the result of the decryption function, we do not know anything about its secrecy label before calling it. This prevents us from using the plaintext secrecy label in a precondition to the decryption function to condition whether we consume a \texttt{guard} permission or not.
+However, we can not refer to the plaintext or its secrecy label in the preconditions of the decryption function to distinguish between the case where the plaintext is versioned, in which we require a fraction of the \texttt{guard} predicate, and the case where the plaintext is unversioned.
+% As the decrypted plaintext is the result of the decryption function, we do not know anything about its secrecy label before calling it. This prevents us from using the plaintext secrecy label in a precondition to the decryption function to condition whether we consume a \texttt{guard} permission or not.
 
-An easier doable solution to this problem would be to always require partial permission of \texttt{guard} when calling the decryption function.
+A possible solution to this problem would be to always require partial permission of \texttt{guard} when calling the decryption function.
 Then, this permission could be returned later when the developer manages to prove that the decrypted plaintext is unversioned.
-However, this is not ideal because it would always require the developer to use the \texttt{guard} predicate to decrypt, even when verifying a protocol that does not use versioned values at all and should not be affected by the deletion mechanism.
+However, this is not ideal because it would always require the developer to use the \texttt{guard} predicate to decrypt, even when verifying a protocol that does not use versioned values at all and should thus not be affected by the deletion mechanism.
 
-Instead, we take advantage of an existing encryption property implemented in all encryption functions of the library: \emph{the secrecy label of the plaintext must flow to the secrecy label of the encryption secret key\footnote{In asymmetric encryption, while we encrypt with the public key, we consider the label of the private (decryption) key for this property.}}.
+Instead, we take advantage of an existing encryption property implemented in all encryption functions of the library: everyone who can read the key used for decryption can possibly obtain the plaintext and must thus be able to read it.
+In terms of secrecy labels, this means that the secrecy label of the plaintext must flow to the secrecy label of the used secret key\footnote{In asymmetric encryption, while we encrypt with the public key, we consider the label of the private (decryption) key for this property.}.
 In particular, this means that a versioned plaintext must be encrypted with a versioned key.
 Upon decryption, while we do not know the secrecy label of the plaintext to be created, we know the secrecy label of the key used for decryption.
-The intuition is to consider that versioned encryption keys are mostly used to encrypt versioned plaintexts, so we could require partial permission of \texttt{guard} only when the decryption key is versioned.
+We thus over-approximate and treat the plaintext as versioned if it was encrypted using a versioned key.
+% The intuition is to consider that versioned encryption keys are mostly used to encrypt versioned plaintexts, so we could require partial permission of \texttt{guard} only when the decryption key is versioned.
 This is a sound overapproximation that should not burden the developer in practice.
 
-Proving that the decryption key is versioned involves proving that its secrecy label \emph{does not} flow to the library owner. We have already seen when creating a versioned nonce section \ref{sec:versioned-nonce} that such negation is not trivial to prove in Gobra.
+Proving that the decryption key is versioned involves proving that its secrecy label \emph{does not} flow to the library owner. We have already seen when creating a versioned nonce section \ref{sec:versioned-nonce} that such a negation is not provable in general.
 Instead, we adopt the same workaround and require the developer to specify whether the decryption key is versioned or not, using a \texttt{versionPerm} argument.
-The simplified implementation of the AEAD decryption function \texttt{AeadDec} is provided in Figure \ref{lst:aead-dec}.
+The simplified specification of the AEAD decryption function \texttt{AeadDec} is provided in Figure \ref{lst:aead-dec}.
 Like in the \texttt{CreateNonce} function, the \texttt{versionPerm} argument must be non-negative (line 1) and is used to specify whether the decryption key is versioned or not.
 
 \begin{figure}
@@ -595,7 +600,7 @@ func (l *LabeledLibrary) AeadDec(ghost keyT tm.Term,
     // ...
 }
     \end{gobra}
-    \caption{Implementation of \texttt{AeadDec}, showcasing the changes to support versioned values in AEAD decryption. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.}
+    \caption{Specification of \texttt{AeadDec}, showcasing the changes to support versioned values in AEAD decryption. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.}
     \label{lst:aead-dec}
 \end{figure}
 
@@ -604,19 +609,22 @@ In this case, this is the only modification to the original implementation of th
 Because the decryption key is unversioned, the resulting plaintext is necessarily also unversioned, which justifies that the deletion methodology does not apply in this case.
 
 If the developer chooses a strictly positive \texttt{versionPerm} value, the decryption key is meant to be versioned. 
-As explained before, we do not enforce the verification that the decryption key is versioned. In a similar manner as in section \ref{sec:choosing-the-right-permission-amounts}, we can prove that this does not impact soundness and it is in the developer's interest to use a versioned decryption key in this case.
+As explained before, we do not create a proof obligation that the decryption key is versioned.
+As mentioned in section \ref{sec:choosing-the-right-permission-amounts}, this over-approximation does not affect soundness but only forces an implementation to safely delete a plaintext in case it would not be necessary.
+% In a similar manner as in section \ref{sec:choosing-the-right-permission-amounts}, we can prove that this does not impact soundness and it is in the developer's interest to use a versioned decryption key in this case.
 We then consume a partial permission of \texttt{guard} (line 6) and return the same amount of permission of \texttt{receipt} (lines 9-10).
 Additionally, the library owner must be a session identifier (line 7) for versions to make sense.
-Then, if the decryption process succeeds, the resulting plaintext is returned and a memory predicate is issued (line 8), expressing that it is now stored in memory.
+Then, if decryption succeeds, the resulting plaintext is returned and a memory predicate is issued (line 8), expressing that it is now stored in memory.
 
 Finally, let's reason about the case where the encryption key is versioned, but not the encrypted content.
-This case is expected to be rare in practice, as there are no benefits in encrypting an unversioned plaintext (that could exist for a whole session) with a versioned key (that is bound to exist for a short period of time).
-However, if it happens, the developer is forced to hand a strictly positive permission fraction of \texttt{guard}. 
+% This case is expected to be rare in practice, as there are no benefits in encrypting an unversioned plaintext (that could exist for a whole session) with a versioned key (that is bound to exist for a short period of time).
+When it happens, the developer is forced to hand a strictly positive permission fraction of \texttt{guard}. 
 They will receive the same amount of permission of \texttt{receipt} for the plaintext in return as if it was versioned.
-But because the plaintext is unversioned and exists in the current version, it means that its secrecy label allows the current session or participant to access it.
+Since the plaintext is unversioned and exists in the current version, it means that its secrecy label allows the current session or participant to access it.
 This means that it could be converted to the next version infinitely with the \texttt{ConvertToNextVersion} function, which would allow the value to keep existing in memory despite version increments.
-Although it works, converting this value for each version would be a burden in practice.
-This is why we offer an additional simple function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, which checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5) to “remove” it from the deletion mechanism.
+Although it works, converting this value for each version would be a verification burden in practice.
+This is why we offer an additional library function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, which checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5).
+This conceptually removes the corresponding values from our deletion tracking mechanism.
 
 \begin{figure}
     \begin{gobra}
@@ -629,15 +637,14 @@ func (l* LabeledLibrary) GuardFromUnversionedReceipt(value []byte,
     valueT Term, versionPerm perm)
 }
     \end{gobra}
-    \caption{Implementation of the abstract \texttt{GuardFromUnversionedReceipt} function, removing an unversioned value from the deletion mechanism. Preconditions and postconditions that are not relevant to the deletion mechanism have been omitted.}
+    \caption{Specification of the abstract \texttt{GuardFromUnversionedReceipt} function, removing an unversioned value from the deletion mechanism. Preconditions and postconditions that are not relevant to the deletion mechanism have been omitted.}
     \label{lst:guard-from-unversioned-receipt}
 \end{figure}
 
-% TODO_ Get rid of the confusion between "full permission" and "the full amount of permission available"
-
 \subsection{Increasing the version of a session}
 
-Now that we have seen all cases about how to create a versioned value, for one or several versions, and how to delete it, we explain how to increment the version of a session. This is done using the \texttt{BumpVersion} function, whose simplified implementation is provided in Figure \ref{lst:bump-version}.
+After having seen all cases in which a versioned value can be created, for one or several versions, and deleted, we explain how to increment the version of a session.
+This is done using the \texttt{BumpVersion} function, whose simplified implementation is provided in Figure \ref{lst:bump-version}.
 
 \begin{figure}
     \begin{gobra}
@@ -648,20 +655,27 @@ ensures  l.Version() == old(l.Version()) + 1
 ensures  acc(guard(l.Version()), nextPerm)
 ensures  acc(guardNext(l.Version() + 1), 1/1)
 func (l* LabeledLibrary) BumpVersion(nextPerm perm) {
+    exhale acc(guard(l.Version()), 1/1)
+    exhale acc(guardNext(l.Version() + 1), nextPerm)
     l.manager.version = l.Version() + 1 // Increment the version
     inhale acc(guard(l.Version()), nextPerm)
     inhale acc(guardNext(l.Version() + 1), 1/1)
 }
     \end{gobra}
-    \caption{Implementation of \texttt{BumpVersion}, incrementing the session's version. Preconditions, postconditions and statements that are not relevant to the deletion mechanism have been omitted.}
+    \caption{Implementation and specification of \texttt{BumpVersion}, incrementing the session's version.
+    In the function's body, \texttt{exhale} is used to consume permission and \texttt{inhale} to emit permission.
+    Preconditions, postconditions and statements that are not relevant to the deletion mechanism have been omitted.
+    In particular, incrementing the session's version requires permission to modify the library, which does not appear in this simplified specification.}
     \label{lst:bump-version}
 \end{figure}
 
-As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1. This was exactly the purpose of the deletion mechanism, as written in Definition \ref{lem:full-guard-no-versioned-value}.
+As explained in the core idea of the methodology (section \ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained the full permission of the \texttt{guard(v)} predicate, which corresponds to the precondition on line 1.
+% This was exactly the purpose of the deletion mechanism, as written in Definition \ref{lem:full-guard-no-versioned-value}.
+Indeed, by lemma \ref{lem:full-guard-no-versioned-value}, full permission to \texttt{guard(v)} implies that all $v$-versioned values have been deleted.
 
-Additionally, we have seen in section \ref{sec:creating-values-with-multiple-versions-for-ratcheting} that when allowed by their secrecy label, $v$-versioned values can be converted to version $v+1$, which consumes a partial permission of the \texttt{guardNext(v+1)} predicate.
+Additionally, we have seen in section \ref{sec:creating-values-with-multiple-versions-for-ratcheting} that, if allowed by their secrecy label, $v$-versioned values can be converted to version $v+1$, which consumes a partial permission of the \texttt{guardNext(v+1)} predicate.
 This means that before incrementing the session's version, the developer has some amount of permission of \texttt{guardNext(v+1)} that may vary between $0$ and $1$.
-The \texttt{BumpVersion} function takes a \texttt{nextPerm} argument, which offers the developer the possibility to transform this \texttt{guardNext(v+1)} permission into a \texttt{guard(v+1)} permission (see the preconditions lines 2-3 and the postcondition line 5).
+Thus, the \texttt{BumpVersion} function takes a \texttt{nextPerm} argument, and turns \texttt{nextPerm}-many permissions of \texttt{guardNext(v+1)} into \texttt{nextPerm}-many permissions of \texttt{guard(v+1)} (see the preconditions lines 2-3 and the postcondition line 5).
 This happens because the \texttt{BumpVersion} function increments the session's version (done on line 8, ensured on line 4).
 Now that the session's version is $v+1$, the methodology explained in section \ref{sec:handling-mutliple-guards} requires us to use the predicate \texttt{guard(v+1)} instead of \texttt{guardNext(v+1)}.
 Finally, the \texttt{BumpVersion} function returns full permission to the \texttt{guardNext(v+2)} predicate (postcondition line 6).
@@ -674,11 +688,10 @@ In parallel, permissions to \texttt{guard(v+1)} and \texttt{guardNext(v+2)} allo
 
 Note that similarly to section \ref{sec:choosing-the-right-permission-amounts}, it is in the developer's interest to specify in \texttt{nextPerm} the full amount of permission of \texttt{guardNext(v+1)} that they have. If they provide a lower amount, the function call to \texttt{BumpVersion} will still succeed, but they will not be able to retrieve the full \texttt{guard(v+1)} permission afterward, which will prevent them from incrementing the session's version to $v+2$.
 
-
-In summary, we have seen how we adapted the Reusable Verification Library to support versioned values, and how the implemented mechanism enforces the deletion of those values at the end of their time frame.
+\subsection*{Summary}
+In this section, we have seen how we adapted the Reusable Verification Library to support versioned values, and how the implemented mechanism enforces the deletion of those values at the end of their time frame.
 While the end result is functional and sound, we have come across various challenges that we had to solve by complexifying the methodology a bit.
-In the next section, we will give a glimpse into an alternative approach to implementing the deletion mechanism more simply, if our verifier, Gobra, had supported \emph{obligations}.
-\todo{How to present this as the summary of the whole section?}
+In the next section, we will give a glimpse into an alternative approach to implementing the deletion mechanism more simply, in case obligations are supported by the targeted program verifier.
 
 \section{Alternative design using obligations}
 \label{sec:alternative-design-using-obligations}
@@ -686,7 +699,7 @@ In the next section, we will give a glimpse into an alternative approach to impl
 An obligation, defined for a thread, specifies an action to be eventually performed by this thread~\cite{}. An obligation is initially \emph{emitted}, and once the action is performed, the obligation is \emph{discharged}.
 
 In this section, we first present how we could use obligations to implement the deletion mechanism in a simpler way.
-Then, as Gobra does not support obligations, we present a way to add them to the language.
+Then, as Gobra does not support obligations, we present a way to add them to the language to be able to implement the deletion mechanism.
 This section will not be as exhaustive as the description of our deletion mechanism and only aims at giving an intuition of how obligations could be used to implement it.
 
 \subsubsection{Idea}
@@ -695,37 +708,46 @@ This section will not be as exhaustive as the description of our deletion mechan
 With a verifier supporting obligations, we could, upon creation of a time-sensitive value, emit an obligation to delete it before the next version increment. 
 In practice, the obligation would be a construct linking the versioned value to its version number.
 The obligation can then be discharged upon calling the secure deletion function on the value.
-Then, when incrementing the protocol's session version, we check that all existing obligations are valid: in our case, the version defined in the obligation is equal to the new version number.
+Then, when incrementing the protocol's session version, we check that all existing obligations are valid: meaning that the version defined in the obligation is greater than or equal to the new version number.
 This means that “old” obligations, with the previous version number, must have been discharged before the version increment.
 
-The obligation mechanism would therefore be composed of two main parts: an obligation construct, and a way to check all existing obligations.
+The obligation mechanism would therefore be composed of two main parts: an obligation construct, and a way to check that all existing obligations satisfy certain properties.
 
 \subsubsection{Adding obligations to Gobra}
 \label{sec:adding-obligations-to-gobra}
 
+In this section, we present a way to add obligations to Gobra to solve the particular problem of implementing our deletion mechanism.
 To add obligations to Gobra, we first need to define the obligation construct.
-It should be parameterized by the value and its version number.
-The easiest way to do it, to avoid modifying the language, is to use an abstract predicate:
+In our case, it should be parameterized by the value to delete and its version number.
+We therefore introduce the keyword \texttt{obligation} to define an obligation in Gobra, and we use a syntax similar to the definition of an abstract predicate:
 \begin{gobra}
-pred Obl(key []byte, version uint32)
+obligation Obl(key []byte, version uint32)
 \end{gobra}
-This predicate could then be emitted upon creation of a versioned value, by returning it in the creation function's postcondition.
+This construct could then be emitted upon creation of a versioned value, by returning it in the creation function's postcondition.
 Invertly, the secure deletion function would require the obligation as a precondition, and would not return it to discharge it.
 
-The second part of the mechanism is to have a function capable of checking all existing obligations. This function could then be called upon incrementing the session's version.
-To do so, our main challenge is to ensure that this function has access to all existing obligations in its scope.
-Indeed, if the obligation predicates are not passed in function calls from a caller to a callee, they will \emph{leak} and will not be visible to the callee. It would be as if the obligation had been discharged.
+The second part of the mechanism is to have an assertion capable of checking certain properties for all existing obligations. This assertion could then be evaluated upon incrementing the session's version.
+To do so, our main challenge is to ensure that this assertion has access to all existing obligations in its scope.
+Indeed, if the obligations are framed around a function call, they will not be visible to the callee.
+% not passed in function calls from a caller to a callee, they will \emph{leak} and will not be visible to the callee. It would be as if the obligation had been discharged.
+And if obligations are not returned to the caller after a function call, they will leak and will not be visible to the caller.
 
-To avoid this, we introduce leak checks.
+To avoid this, we introduce \emph{frame checks} and leak checks.
+% TODO_ explain what each check solve
+We can implement these frame and leak checks by using inhale-exhale expressions available on the Viper level.
+These expressions can be used in preconditions and postconditions and will only be evaluated either in the caller or in the callee context, which gives us sufficient expressivity.
+Within inhale-exhale expression, we can use the \texttt{forperm} construct to quantify over all obligations in the current context.
+
+% TODO_ continue from here
 The idea is to add preconditions and postconditions to all functions to make sure that all obligations in scope are passed in function calls. This ensures that in any function, all existing obligations are in scope.
 When verifying Gobra files, the Gobra code is first translated to Viper code, which is then verified.
-To add leak checks to all Gobra functions, we could modify the translation process to automatically add leak checks to all Viper functions.
-Such leak check can be defined in Viper using the \texttt{forperm} construct, which allows iteration over all permissions in scope:
+To add frame checks to all Gobra functions, we could modify the translation process to automatically add frame checks to all Viper functions.
+Such frame check can be defined in Viper using the \texttt{forperm} construct, which allows iteration over all permissions in scope:
 \begin{gobra}
-define leak_check [true, forperm k: Ref, v: Int [Obl(k, v)] :: false]
+define frame_check [true, forperm k: Ref, v: Int [Obl(k, v)] :: false]
 \end{gobra}
-Without going into details, this leak check expression, when used as a precondition, makes sure that the function caller passes all obligations in its scope to the callee. When used as a postcondition, it makes sure that the function callee returns all obligations in its scope to the caller.
-Now that no obligation leaks, we could check the version of all existing obligations upon incrementing the session's version, with a similar \texttt{forperm} expression.
+Without going into details, this frame check expression, when used as a precondition, makes sure that the function caller passes all obligations in its scope to the callee. When used as a postcondition, it makes sure that the function callee returns all obligations in its scope to the caller.
+Now that no obligation is lost, we could check the version of all existing obligations upon incrementing the session's version, with a similar \texttt{forperm} expression.
 
-Therefore, using leak checks, we provide a simple way to implement obligations in Gobra to ultimately implement a deletion mechanism.
-Note that the given leak check mechanism, given for the sake of simplicity, is not optimal yet. Indeed, it requires passing all obligations in scope, even when calling a function that does not need to read them, which can be a burden for the developer. The approach could be improved by providing a way to frame obligations around function calls that do not need them.
+Therefore, using frame checks, we provide a simple way to implement obligations in Gobra to ultimately implement a deletion mechanism.
+Note that the given frame check mechanism, given for the sake of simplicity, is not optimal yet. Indeed, it requires passing all obligations in scope, even when calling a function that does not need to read them, which can be a burden for the developer. The approach could be improved by providing a way to frame obligations around function calls that do not need them.
