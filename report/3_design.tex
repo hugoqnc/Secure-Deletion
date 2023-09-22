@@ -168,6 +168,7 @@ Note that with this approach, one could think that the developer could just neve
 Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions \cite{}.
 % In this section, we build our method on the same intuition as the approach explained above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
 While counting permissions follow a similar idea as a counter, they overcome the limitations mentioned earlier and are suitable for our use case, i.e., supporting arbitrary representations of application state and supporting concurrency.
+\todo{Do they really support concurrency? See after}
 
 We start by introducing the notion of counting permissions.
 Because this permission model is not available in the current version of Gobra, we then explain how we can obtain similar functionality using the existing permission system.
@@ -188,6 +189,9 @@ To implement a deletion mechanism using the counting permissions model, we use a
 
 The major difference with a simple counter variable is that the developer \emph{cannot} create a $-1$ token bundle the way they could just decrement the counter variable. They \emph{have to} delete all $i$-versioned terms and cannot circumvent the deletion mechanism.
 \todo{I may transition by saying that counting permissions may not trivially support concurrency, but the approach we introduce next does.}
+
+% To support concurrency, we could protect the token factory with a lock.
+% Then, splitting the factory to obtain a bundle, or summing the factory with a bundle, would require acquiring the lock.
 
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
@@ -230,13 +234,13 @@ For each created value, they will receive the same amount of permission of \text
 When they want to increment the version of the session, they will have to delete all \texttt{v}-versioned values and will consume all \texttt{receipt(key, v)} fractional permissions.
 They will receive the same amount of permission of \texttt{guard(v)} as the consumed \texttt{receipt(key, v)} permission for each deleted value.
 Therefore, we know that no versioned value readable in version \texttt{v} remains in memory when we have full permission on \texttt{guard(v)}.
-The following definition expresses this property:
+The following lemma expresses this property:
 
-\begin{definition}\label{def:full-guard-no-versioned-value}
+\begin{lemma}\label{lem:full-guard-no-versioned-value}
     We denote $\texttt{perm}$ the function taking a predicate and returning its available permission fraction.
     If there exists a $v \in \mathbb{N}$ such that $\texttt{perm}(\texttt{guard}(v)) = 1$, then $v$ is the current session's version, and no $v$-versioned value exists in memory.
     % Reciprocally, if $v$ is the current session's version and no $v$-versioned value exists in memory, then $\texttt{perm}(\texttt{guard}(v)) = 1$.
-\end{definition}
+\end{lemma}
 
 Consequently, we require full permission on \texttt{guard(v)} to call the function that increments the version of the session.
 
@@ -244,7 +248,7 @@ Similarly to counting permissions, the developer cannot bypass the deletion mech
 This is assuming that the developer does not use Gobra's \texttt{inhale} statement to bypass the permission system.
 
 Note that the receipt predicate takes the created byte array \texttt{key} as an argument.
-This is used at deletion to verify that we delete the actual value associated with the receipt, before returning the \texttt{guard(v)} permission fraction. Otherwise, the developer could simply delete arbitrary (unversioned) values to transform some \texttt{receipt(key, v)} permission fraction into a \texttt{guard(v)} permission fraction, and circumvent the guarantee of deletion of versioned values.
+This is used at deletion time to verify that we delete the actual value associated with the receipt, before returning the \texttt{guard(v)} permission fraction. Otherwise, the developer could simply delete arbitrary (unversioned) values to transform some \texttt{receipt(key, v)} permission fraction into a \texttt{guard(v)} permission fraction, and thus violate lemma \ref{lem:full-guard-no-versioned-value}. %circumvent the guarantee of deletion of versioned values.
 % We can express the fact that our deletion mechanism cannot be circumvented with the following definition:
 
 % \begin{definition}\label{def:sum-perm-leq-1}
@@ -260,74 +264,93 @@ This is used at deletion to verify that we delete the actual value associated wi
 \subsubsection{Choosing the right permission amounts}
 \label{sec:choosing-the-right-permission-amounts}
 
-With this Gobra implementation, the developer is given more responsibility than in the counting permissions model.
+With these library specifications, the developer has some flexibility in choosing fractional permission amounts when invoking library functions.
 Indeed, upon creating or deleting a versioned value, the developer chooses the permission amount of the \texttt{guard} or \texttt{receipt} that will be consumed.
+Picking too large permission amounts that would result in a contradiction of lemma \ref{lem:full-guard-no-versioned-value} correctly results in verification errors.
+The chosen permission amounts thus only affect completeness.
+% With this Gobra implementation, the developer is given more responsibility than in the counting permissions model.
 
-When creating versioned values, the developer has to choose small enough permission amounts of \texttt{guard} to consume so that all values can be created.
+When creating versioned values, the developer has to choose small enough permission amounts of the \texttt{guard} predicate to consume so that all desired values can be created.
 For example, if they want to create $3$ versioned values, but consume $1/2$ of \texttt{guard} for the two first values, they will not be able to create the third value because they will not have enough permission of \texttt{guard} left.
 This does not affect the soundness of the methodology but simply prevents the developer from implementing their goal.
 It is therefore in their interest to carefully choose permission amounts.
+Note that unboundedly many versioned values can be created even when it is not statically known how many values will be created in the implementation.
+For example, this is doable by consuming $1/2$ of the \texttt{guard} predicate permission for the first created value and dividing the consumed permission by $2$ for each subsequent created value, i.e. consuming $1/4$ for the second value, $1/8$ for the third value, etc.
 
-When deleting versioned values, the developer has to specify the full permission amount of \texttt{receipt} to consume.
-Indeed, in Gobra, we currently cannot know how much permission of \texttt{receipt} is available in the current context.
-This is why the developer has to manually specify the full permission amount of \texttt{receipt} to consume.
-However, they could specify a smaller amount than the amount they have, and the deletion function call would work.
-However, by doing so, the developer will never be able to retrieve the full \texttt{guard} permission, which will prevent them from incrementing the version of the session.
-Again, the methodology's soundness remains unaffected, the only consequence is the developer's inability to realize their objective.
-It is therefore in their interest to specify the full \texttt{receipt} permission amount upon deletion.
-The following definition expresses this property:
+When deleting a versioned value, the developer has to specify the same permission amount of the \texttt{receipt} predicate to consume as the amount that was created by the library when creating the versioned value.
+Indeed, automatically picking the available permission amount of \texttt{receipt} in the current context could be insufficient in cases where some permission amount of \texttt{receipt} has leaked or is hidden\footnote{We say that some permission amount to a heap location or a predicate $x$ \emph{leaks} when the total available permission amount of $x$ in the current context is not fully returned to the caller in a postcondition of the current function, so a permission amount of $x$ is lost forever. We say that some permission amount of $x$ is \emph{hidden} when it is \emph{folded} in a predicate $y$, meaning that a permission amount of $x$ is replaced with a permission amount of $y$.}, and is either way not currently supported by Gobra.
+% Additionally, in Gobra, we currently cannot know how much permission of \texttt{receipt} is available in the current context.
+This is why we require the developer to manually specify the right permission amount of \texttt{receipt} to consume.
+% However, they could specify a smaller amount than the amount they have, and the deletion function call would work.
+If the developer calls the delete function and specifies a smaller amount than the permission amount of the \texttt{receipt} predicate that was created by the library, while there will be no immediate verification error, the developer will not be able to recover the full permission to the \texttt{guard} predicate.
+This will prevent them from incrementing the version of the session.
+Again, the methodology's soundness remains unaffected, but the developer has to be careful when specifying the permission amount of \texttt{receipt} to consume to avoid completeness issues.
+% the only consequence is the developer's inability to realize their objective.
+% It is therefore in their interest to specify the full \texttt{receipt} permission amount upon deletion.
+The following lemma expresses this property:
 
-\begin{definition}\label{def:sum-perm-eq-1}
+\begin{lemma}\label{lem:sum-perm-eq-1}
 
     % We consider the same notations as in Definition \ref{def:sum-perm-leq-1}.
-    Let $v$ represent the current version of the session and $n$ the number of $v$-versioned values in the current state. $\forall i \in \llbracket 0, n \rrbracket$, we denote $key_i$ the $i$-th $v$-versioned value.
-    Additionally, we assume the developer always deletes a versioned value specifying the same permission amount as the one they used to create it.
+    Let $v$ represent the current version of the session and $n$ the number of $v$-versioned values in the current state. $\forall i \in \llbracket 1, n \rrbracket$, we denote $key_i$ the $i$-th $v$-versioned value.
+    Additionally, we assume the developer always deletes a versioned value specifying the same permission amount as the one they used to create it, and more generally that no permission amount of the predicates \texttt{guard} and \texttt{receipt} has leaked or is hidden.
     Then, we can express the following property:
     \begin{align*}
         \left(\texttt{perm(guard($v$))} + \sum_{i=1}^n \texttt{perm(receipt($key_i$, $v$))}\right) = 1
     \end{align*}
 
-\end{definition}
+\end{lemma}
 
-At the end of the day, we have identified a satisfactory approach for achieving functionality reminiscent of counting permissions in Gobra. Despite placing additional responsibility on the developer, this method is sound and constitutes the core of our deletion mechanism.
+To conclude, we have obtained a satisfactory approach to track the number of versioned values, that meet all of our requirements.
+Our approach is, contrary to counting permissions, supported by Gobra.
+As we wanted, our approach also supports arbitrary representations of the application state, concurrency and unboundedly many versioned values.
+% To conclude, we have identified a satisfactory approach for achieving functionality reminiscent of counting permissions in Gobra.
+Despite giving more flexibility to the developer, this method is sound and constitutes the core of our deletion mechanism.
+\todo{I don't explain why our approach supports concurrency}
 
 \section{Extension of the library}
 \label{sec:extension-of-the-library}
 
 We introduced a general mechanism to enforce the deletion of versioned values before the end of their time frame, defined in terms of versions allowed by their secrecy label.
 This mechanism is central to the methodology.
-In this section, we explain how we integrate it in Arquint's et al.\ Reusable Verification Library, to provide the developer with functions handling versioned values.
+In this section, we explain how we integrate it in Arquint's et al.\ Reusable Verification Library \cite{}, to provide the developer with functions handling versioned values.
 
 We start by explaining how we store and access the current version of a session.
-Then, we explain how we adapted the functions that create values to support versioned values according to our methodology.
+Then, we explain how we adapted the functions that create a value, e.g. a nonce, to support versioned values according to our methodology.
 Similarly, we present our secure deletion function made to delete those versioned values.
 We continue by introducing two special cases that required particular effort to support versioned values and fit our methodology: key ratcheting and encryption/decryption. 
-Our deletion mechanism is made complete with a description of our function to increase the version of a session when all “old” values have been deleted.
+Afterward, we describe a description of our function to increase the version of a session when all “old” values have been deleted.
 
-Finally, we give a glimpse of an alternative and simpler approach to implement a similar deletion mechanism, in the case of a verifier that supports obligations, which is not the case of Gobra. 
+Finally, we give a glimpse of an alternative approach to implement a similar deletion mechanism, based on obligations, that can be used instead if the targeted verifier supports obligations.
+% in the case of a verifier that supports obligations, which is not the case of Gobra. 
 
 \subsection{Storing the current session version}
 \label{sec:storing-the-current-session-version}
 
-Before we can implement the deletion mechanism in detail, we need a place to store the current version of a protocol session.
+We will later see several library functions that have to compare a version appearing in a secrecy label to the \emph{current} version of the session.
+Retrieving the current version from the global trace directly is not possible because, as it is a concurrent data structure, there might be interleaving operations by other participants or sessions between the moment we retrieve the version and the moment we use it.
+However, we assume that each session has its own version, which can only be altered by this session.
+Hence, we turn the version into a local field within the library that can only be altered by corresponding library calls.
+
+% Before we can implement the deletion mechanism in detail, we need a place to store the current version of a protocol session.
 Currently, the library already handles the storage of the current protocol participant and session.
-These are stored in a field called \texttt{owner} that is an identifier, meaning either a participant identifier $(p)$ or a session identifier $(p,s)$, where $p$ is a participant and $s$ is a session.
+These are stored in a field called \texttt{owner} that is either a participant identifier $(p)$ or a session identifier $(p,s)$, where $p$ is a participant and $s$ is a session.
 This field is used in the concurrent data structure, as a key to a dictionary mapping identifiers to their corresponding snapshot, where we recall that snapshots are local copies of the global trace.
-Even though a first thought could be to store the version $v$ as part of the \texttt{owner}, in a version identifier $(p,s,v)$, a protocol participant should keep using the same snapshot mapping during a protocol session.
+% Even though a first thought could be to store the version $v$ as part of the \texttt{owner}, in a version identifier $(p,s,v)$, a protocol participant should keep using the same snapshot mapping during a protocol session.
+Since \texttt{owner} is used as a key to the snapshots mapping, we cannot include the version in the \texttt{owner} field because this would result in a different map lookup whenever the session's version is incremented.
 
 Therefore, we store the current version of a session in a separate field, as an integer.
-The version is not stored on the global trace, as it would be unnecessary complexity.
-The session is however still stored as part of the library state, which makes it easily accessible to all library functions.
+The session is stored as part of the library state, which makes it easily accessible to all library functions.
 For a function taking a \texttt{LabeledLibrary} struct \texttt{l}, holding the state of the library, the current version of the session will be referred to as \texttt{l.Version()} in the future code figures.
 The owner is similarly obtainable using \texttt{l.Owner()}.
-Additionally, it is often useful when working with secrecy labels to know the complete version identifier $(p,s,v)$. This is the concatenation of the owner and version fields, which can be obtained using \texttt{l.OwnerWithVersion()}.
+Additionally, it is often useful when working with secrecy labels to know the complete version identifier $(p,s,v)$. This is the combination of the owner and version fields, which is returned by \texttt{l.OwnerWithVersion()}.
 
 \subsection{Creation of versioned values}
 \label{sec:creation-of-versioned-values}
 
 It is easy to categorize functions that create values: they all return full permission to a new memory predicate \texttt{Mem} of the created value.
 The library provides three functions to create values: \texttt{CreateNonce} to create some random value, \texttt{GeneratePkeKey} to create a public/private key pair, and \texttt{GenerateDHKey} to create a secret key for Diffie-Hellman key exchange.
-Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this subsection. Its simplified implementation is provided in Figure \ref{lst:create-nonce}.
+Those three functions are implemented very similarly and have required the same changes to support versioned values. Therefore, we will only discuss the \texttt{CreateNonce} function in this subsection. Its simplified specification is provided in Figure \ref{lst:create-nonce}.
 
 \begin{figure}
     \begin{gobra}
@@ -347,21 +370,22 @@ func (l *LabeledLibrary) CreateNonce(ghost nonceLabel SecrecyLabel,
     // ...
 }
     \end{gobra}
-    \caption{Implementation of \texttt{CreateNonce} showcasing the changes to support versioned values. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.
-    CanFlow represents the flowing relation between secrecy labels, as defined in section \ref{sec:dy-star}, and takes a snapshot of the global trace and the two secrecy labels as arguments.}
+    \caption{Specification of \texttt{CreateNonce} showcasing the changes to support versioned values. Preconditions, postconditions and arguments that are not relevant to the changes have been omitted.
+    CanFlow represents the flow relation between secrecy labels, as defined in section \ref{sec:dy-star}, and takes a snapshot of the global trace and two secrecy labels as arguments.}
     \label{lst:create-nonce}
 \end{figure}
 
 This function takes a \texttt{versionPerm} argument, which is required to be non-negative.
 The developer can use this argument to specify whether they want to create a versioned or unversioned nonce. Choosing $0$ means that the nonce will be unversioned, and choosing a strictly positive value means versioned.
-In any case, when the function completes with no error, it returns full permission of the memory predicate \texttt{Mem(nonce)}, expressing that the nonce is now stored in memory.
+In both cases, when the function completes with no error, it returns full permission of the memory predicate \texttt{Mem(nonce)}, expressing that the nonce is now stored in memory.
 
 \subsubsection{Unversioned nonce}
 \label{sec:unversioned-nonce}
 
 In this case, the developer chooses $0$ for the \texttt{versionPerm} argument.
-The only additional precondition (lines 2-3) to satisfy is that the given nonce label should flow to the library owner.
+As required by lines 2-3, the provided secrecy label has to flow to the library owner because otherwise, the developer could create a nonce that they are not allowed to read, contradicting the modeling of corruption.
 Depending on if sessions are used, the library owner is either a participant $(p)$ or a session $(p,s)$ identifier.
+The other preconditions do not have to be satisfied because they are only relevant to the versioned case.
 
 Because no version identifier $(p,s,v)$ flows to $(p,s)$ or $(p)$, we know when verifying this precondition that the nonce label must be composed of some non-versioned identifier, e.g. is unversioned.
 Therefore, when the developer chooses $0$ for the \texttt{versionPerm} argument and proves that the nonce label is unversioned, then the library behaves as the original implementation and creates an unversioned nonce, without consuming any permission of \texttt{guard}.
@@ -373,60 +397,60 @@ In this second case, the developer chooses a strictly positive \texttt{versionPe
 This value is used to specify the amount of permission of \texttt{guard} to consume (line 5), as discussed in section \ref{sec:choosing-the-right-permission-amounts}.
 Additionally, the library owner must be a session identifier (line 6) and not a participant, because a version identifier $(p,s,v)$ requires a session $s$ to be defined.
 Finally, the nonce label must flow to the library owner \emph{at the current version} (lines 7-8).
-This is to ensure that the created nonce is readable at least in the current context.
+This is to at least ensure that the created nonce is readable by the current session and version.
 
-However, the flowing relation is not enough to ensure that the nonce label is actually versioned. To do so, one would have to prove that the nonce label \emph{cannot} flow to the library owner (without version), as shown on this precondition:
+However, the flow relation is not enough to ensure that the nonce label is actually versioned. To do so, one would have to prove that the nonce label \emph{cannot} flow to the library owner (without version), as shown in this precondition:
 
 \begin{gobra}
 requires versionPerm > 0 ==>
     !CanFlow(l.Snapshot(), nonceLabel, Readers(set[p.Id]{l.Owner()}))
 \end{gobra}
 
-Mainly because of the negation, the problem is that such a condition is not trivial to verify in Gobra, which would require significant work for the developer each time they want to create a versioned value.
-Therefore, we decided to not enforce this condition, as it is not necessary to ensure the soundness of the methodology.
-If the developer “accidentally” creates a nonce with an unversioned label, but using strictly positive \texttt{versionPerm} (meant to be used for versioned values), they will not be prevented from doing so.
-However, they will be bound by the constraints of the deletion mechanism. For now, it means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:conversion-function} that another way is possible).
-Either way, this will just result in too tight constraints but does not call into question the soundness of the deletion mechanism.
+Establishing this precondition is however not possible because it would entail proving that no reader specified in the nonce label has been corrupted. Indeed, if one of the readers had been corrupted, then the nonce label would flow to \emph{Public}, so it would flow to any secrecy label, including the library owner.
+Therefore, we decided to not enforce this condition, as it is not necessary to ensure soundness of the methodology.
+If the developer “accidentally” creates a nonce with an unversioned label, but uses a strictly positive \texttt{versionPerm} (meant to be used for versioned values), verification will not fail.
+However, they will be bound by the constraints of the deletion mechanism. For now, this means that they will be forced to safely delete their unversioned nonce before the next increment of the session's version (but we will see in section \ref{sec:conversion-function} that another way is possible).
+Either way, this will just result in additional proof obligations without any benefits for proving security properties because the nonce's secrecy label is still the same, i.e. unversioned.
+% too tight constraints but does not call into question the soundness of the deletion mechanism.
 
-Finally, the postcondition (lines 9-10) states that the developer will receive the same amount of (strictly positive) permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was defined in section \ref{sec:counting-permissions-idea}.
+Finally, the postcondition (lines 9-10) states that the developer will receive the same (strictly positive) amount of permission of \texttt{receipt} as the amount of permission of \texttt{guard} consumed. This is indeed what was defined in section \ref{sec:counting-permissions-idea}.
 
 \subsection{Secure deletion of versioned values}
 \label{sec:secure-deletion-of-versioned-values}
 
-The library provides the function \texttt{DeleteSafely} to securely delete a versioned value. Its simplified implementation is provided in Figure \ref{lst:delete-safely}.
+The library provides the function \texttt{DeleteSafely} to securely delete a versioned value. Its implementation and simplified specification are provided in Figure \ref{lst:delete-safely}.
 
 \begin{figure}
     \begin{gobra}
 requires versionPerm > 0
 requires acc(receipt(value, l.Version()), versionPerm)
 requires Mem(value)
-ensures  err == nil ==> acc(guard(l.Version()), versionPerm)
+ensures  acc(guard(l.Version()), versionPerm)
 func (l* LabeledLibrary) DeleteSafely(value []byte,
-    ghost versionPerm perm) (err error) {
-    // ...
+    ghost versionPerm perm) {
+    // Overwrite the value with zeros
+    for i := range value {
+        value[i] = 0
+    }
+    // Prevent the compiler from optimizing the entire function
+    runtime.KeepAlive(value)
+    return
 }
     \end{gobra}
-    \caption{Implementation of \texttt{DeleteSafely}, used to delete a versioned value. Preconditions, postconditions and arguments that are not relevant to the deletion mechanism have been omitted.}
+    \caption{Implementation and simplified specification of \texttt{DeleteSafely}, used to delete a versioned value. Preconditions, postconditions and arguments that are not relevant to the deletion mechanism have been omitted.}
     \label{lst:delete-safely}
 \end{figure}
 
 This function behaves like the opposite of the \texttt{CreateNonce} function in the \emph{versioned} case.
 It takes a strictly positive \texttt{versionPerm} argument, which is used to specify the amount of permission of \texttt{receipt} to consume (line 2).
-This same amount of permission of \texttt{guard} is returned (line 4) when no error has occurred during the deletion process.
+The same amount of permission of \texttt{guard} is returned (line 4) when no error has occurred during the deletion process.
 Recall that the \texttt{DeleteSafely} function does not check that the given \texttt{receipt} permission amount for this value is the full amount of permission available.
-But as discussed in section \ref{sec:choosing-the-right-permission-amounts}, it is in the developer's interest to specify the full amount if they want verification to succeed.
+But as discussed in section \ref{sec:choosing-the-right-permission-amounts}, it is in the developer's interest to specify the full amount if they want verification to succeed, i.e. eventually being able to increment the session's version.
 Additionally, \texttt{DeleteSafely} consumes the memory predicate of the deleted value (line 3), expressing that the value is no longer stored in memory.
 
-To securely erase the value from memory, we used the following implementation:
-\begin{gobra}
-// Overwrite the value with zeros
-for i := range value {
-    value[i] = 0
-}
-// Prevent the compiler from optimizing the entire function
-runtime.KeepAlive(value)
-\end{gobra}
-This ensures that after execution, the value has been physically erased from memory, and is unretrievable.
+To securely erase a value from memory, we use the implementation shown in lines 7-12 of Figure \ref{lst:delete-safely}.
+This ensures that the memory is zeroed out, and line 12 seems sufficient to prevent the Go compiler from eliminating the function's body.
+\todo{Paper to cite here?}
 
 \subsection{Creating values with multiple versions for ratcheting}
 \label{sec:creating-values-with-multiple-versions-for-ratcheting}
@@ -434,18 +458,18 @@ This ensures that after execution, the value has been physically erased from mem
 When presenting the Diffie-Hellman Ratchet in section \ref{sec:diffie-hellman-ratchet}, we explained the purpose of the ratcheting step, which is to derive a new communication key from the previous one. Once a new communication key has been derived, the previous one is no longer needed and should be deleted.
 Intuitively, the new key should exist in a more recent time frame than the previous one, and both keys should coexist for a short period of time, from the ratcheting step to the deletion of the previous key.
 
-In terms of versions, this means that if the previous key $K_n$ is versioned with the current version $v$, it is not sufficient to only create the new key $K_{n+1}$ with version $v+1$ because it could not coexist with $K_n$.
+In terms of versions, this means that if the previous key $K_n$ is versioned with the current version $v$, it is not sufficient to create the new key $K_{n+1}$ only with version $v+1$ because it could not coexist with $K_n$.
 % we want to create a new versioned key $K_{n+1}$ with version $v+1$. This way, the developer could increment the session's version after the ratcheting step, which would enforce the deletion of $K_n$.
-Additionally, we have seen in section \ref{sec:versioned-nonce} that creating a versioned key requires it to be readable at least in the current context. This means that when creating $K_{n+1}$, we would have to prove that $K_n$ is readable in the current version $v$. To make $K_{n+1}$ readable both in version $v$ and $v+1$, we could for example use the secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner.
-This label now allows $K_n$ and $K_{n+1}$ to coexist while the session's version is $v$.
-Then, after the ratcheting step, the developer would want to increment the session's version. The methodology enforces that $K_n$ is deleted before the version increment.
+Additionally, we have seen in section \ref{sec:versioned-nonce} that creating a versioned key requires it to be readable at least in the current context. This means that when creating $K_{n+1}$, we would have to prove that it is readable in the current version $v$. To make $K_{n+1}$ readable both in version $v$ and $v+1$, we could for example use the secrecy label $[(p,s,v), (p,s,v+1)]$, where $p$ and $s$ are the participant and session of the library owner.
+This label now allows $K_n$ and $K_{n+1}$ to coexist in version $v$.
+Then, after the ratcheting step, the developer would want to increment the session's version to $v+1$. The methodology enforces that $K_n$ is deleted before the version increment.
 
-However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed\footnote{For the sake of clarity, note that in this and subsequent paragraphs, the notations $v$ and \texttt{v} denote the same variable.}. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which is not what we want.
+However, while this label makes $K_{n+1}$ theoretically readable in version $v+1$, it does not yet align with our deletion methodology. Because $K_{n+1}$ is created while the current version is $v$, a permission fraction of \texttt{guard(v)} (and not \texttt{guard(v+1)}) will be consumed\footnote{For the sake of clarity, note that in this and subsequent paragraphs, $v$ and \texttt{v} denote the same version value.}. This fraction can currently be restored only by deleting $K_{n+1}$ \emph{before} incrementing the session's version to $v+1$, which would defeat the purpose of the ratcheting step.
 
 \subsubsection{Conversion function}
 \label{sec:conversion-function}
 
-To solve this problem, we introduce a generic way to proceed for values with a secrecy label flowing to several versions.
+To solve this problem, we introduce a generic way to migrate values from one version to the next one if this is permitted by their secrecy labels.
 Intuitively, a versioned value \texttt{key} created in version $v$ has consumed some permission of \texttt{guard(v)} and returned some permission of \texttt{receipt(key, v)}.
 If \texttt{key}'s secrecy label also flows to the next version $v+1$, we want to allow \texttt{key} to continue to exist in version $v+1$.
 To do so, we offer the developer to \emph{convert} \texttt{key}'s receipt to a new \texttt{receipt(key, v+1)}. At the same time, we return the consumed \texttt{guard(v)} permission but consume an equivalent amount of \texttt{guard(v+1)} permission.
@@ -633,7 +657,7 @@ func (l* LabeledLibrary) BumpVersion(nextPerm perm) {
     \label{lst:bump-version}
 \end{figure}
 
-As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1. This was exactly the purpose of the deletion mechanism, as written in Definition \ref{def:full-guard-no-versioned-value}.
+As explained in the core idea section of the methodology (\ref{sec:counting-permissions-idea}), the developer must have deleted all $v$-versioned values before incrementing the session's version $v$ to $v+1$. This means that the developer must have obtained full permission on \texttt{guard(v)}, which is the precondition on line 1. This was exactly the purpose of the deletion mechanism, as written in Definition \ref{lem:full-guard-no-versioned-value}.
 
 Additionally, we have seen in section \ref{sec:creating-values-with-multiple-versions-for-ratcheting} that when allowed by their secrecy label, $v$-versioned values can be converted to version $v+1$, which consumes a partial permission of the \texttt{guardNext(v+1)} predicate.
 This means that before incrementing the session's version, the developer has some amount of permission of \texttt{guardNext(v+1)} that may vary between $0$ and $1$.

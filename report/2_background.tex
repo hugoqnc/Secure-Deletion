@@ -154,7 +154,9 @@ Ultimately, this global trace contains each participant's current and all past s
 DY* achieves modular reasoning by specifying a trace invariant and verifying that each function modifies the global trace only in ways that maintain the trace invariant. Global security properties can then be proved from this trace invariant.
 
 On the global trace, each state is annotated with a \emph{session state identifier} to indicate to which participant and protocol session it belongs. This models the fact that a participant may be involved in multiple independent protocol sessions simultaneously. The session state identifier includes a \emph{version} that distinguishes between different phases within a protocol session.%, as explained in detail in section \ref*{sec:existing-approach-dy}. 
-Each participant's state comprises several values that together constitute the program state of the participant. Each of these values is assigned a \emph{secrecy label}, indicating which participants are allowed to read the value.
+Each participant's state comprises several values that together constitute the program state of the participant.
+By value, we mean here and in the rest of this thesis a piece of data that is stored on the heap.
+Each of these values is assigned a \emph{secrecy label}, indicating which participants are allowed to read the value.
 % In DY*, if an attacker corrupts a participant or one of its sessions (possibly with a specific version), they will obtain all values having the corrupted session state identifier as a secrecy label.
 A value can be made accessible to a participant $p$, to only some specific session $s$ of a participant, or even to some specific version $v$ of a session.
 A secrecy label is most often defined as a list of everyone who can access the value. For example, a value with a secrecy label $[(\text{Alice}), (\text{Bob}, 3), (\text{Charlie}, 2, 7)]$ can be accessed by Alice at any time, by Bob in session 3, and by Charlie when his second session is in version 7. We will keep this notation of secrecy labels throughout this thesis.
