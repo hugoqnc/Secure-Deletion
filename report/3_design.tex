@@ -732,22 +732,20 @@ Indeed, if the obligations are framed around a function call, they will not be v
 % not passed in function calls from a caller to a callee, they will \emph{leak} and will not be visible to the callee. It would be as if the obligation had been discharged.
 And if obligations are not returned to the caller after a function call, they will leak and will not be visible to the caller.
 
-To avoid this, we introduce \emph{frame checks} and leak checks.
-% TODO_ explain what each check solve
+To avoid this, we introduce \emph{frame checks}, to ensure that all obligations are passed to a function call, and leak checks, to ensure that all obligations are returned to the caller at the end of a function call.
 We can implement these frame and leak checks by using inhale-exhale expressions available on the Viper level.
 These expressions can be used in preconditions and postconditions and will only be evaluated either in the caller or in the callee context, which gives us sufficient expressivity.
-Within inhale-exhale expression, we can use the \texttt{forperm} construct to quantify over all obligations in the current context.
-
-% TODO_ continue from here
-The idea is to add preconditions and postconditions to all functions to make sure that all obligations in scope are passed in function calls. This ensures that in any function, all existing obligations are in scope.
+% Within an inhale-exhale expression, we can use the \texttt{forperm} construct to quantify over all obligations in the current context.
+% The idea is to add preconditions and postconditions to all functions to make sure that all obligations in scope are passed in function calls. This ensures that in any function, all existing obligations are in scope.
 When verifying Gobra files, the Gobra code is first translated to Viper code, which is then verified.
-To add frame checks to all Gobra functions, we could modify the translation process to automatically add frame checks to all Viper functions.
-Such frame check can be defined in Viper using the \texttt{forperm} construct, which allows iteration over all permissions in scope:
+To add frame and leak checks to all Gobra functions, we could modify the translation process to automatically add such checks to all Viper functions.
+In our case, a frame check and a leak check can be defined in Viper with the same assertion, using the \texttt{forperm} construct to quantify over all obligations in the current context:
 \begin{gobra}
-define frame_check [true, forperm k: Ref, v: Int [Obl(k, v)] :: false]
+define check [true, forperm k: Ref, v: Int [Obl(k, v)] :: false]
 \end{gobra}
-Without going into details, this frame check expression, when used as a precondition, makes sure that the function caller passes all obligations in its scope to the callee. When used as a postcondition, it makes sure that the function callee returns all obligations in its scope to the caller.
-Now that no obligation is lost, we could check the version of all existing obligations upon incrementing the session's version, with a similar \texttt{forperm} expression.
+Without going into details, this \texttt{check} assertion, when used as a precondition, behaves as a frame check and makes sure that the function caller passes all obligations in its scope to the callee. When used as a postcondition, it behaves as a leak check and makes sure that the function callee returns all obligations in its scope to the caller.
+Now that all obligations are always available in the current context, we could check the version of all existing obligations upon incrementing the session's version, with a similar \texttt{forperm} expression.
 
-Therefore, using frame checks, we provide a simple way to implement obligations in Gobra to ultimately implement a deletion mechanism.
-Note that the given frame check mechanism, given for the sake of simplicity, is not optimal yet. Indeed, it requires passing all obligations in scope, even when calling a function that does not need to read them, which can be a burden for the developer. The approach could be improved by providing a way to frame obligations around function calls that do not need them.
+Therefore, using frame and leak checks, we provide a simple way to implement obligations in Gobra to ultimately implement a deletion mechanism.
+Note that the given mechanism, given for the sake of simplicity, is not optimal yet. Indeed, it requires passing all obligations in scope, even when calling a function that does not need to read them, which can be a verification burden for the developer.
+The approach could be improved by allowing framing obligations around a function call in the case that the callee and all transitively called callees do not increment the version.
