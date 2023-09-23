@@ -442,3 +442,34 @@ This secrecy property expresses both forward secrecy and post-compromise securit
 To sum up, we have shown the path to complete the verification of our protocol's security properties.
 This will require some modifications to existing annotations, including strengthening the message invariant and probably writing additional lemmas. 
 
+\section{Results}
+\label{sec:results}
+
+We finish this case study by reporting some quantitative results about the verification of our full ratcheting protocol.
+Figure \ref{fig:results} provides the number of lines of code (LOC), the number of lines of specification (LOS) and the verification time for the implementations of the full ratcheting protocol and the original WireGuard.
+The number of lines of specification does not count the lines of the Reusable Verification Library, and the verification time does not include the time to verify the library.
+This is justified because the library is protocol-independent and can be verified once and for all.
+
+Our full ratcheting protocol is composed of 759 lines of code and 6167 lines of specification, which is around 8.1 times more specification than code.
+In comparison, the original WireGuard implementation is composed of around 10.8 times more specification than code, but corruption has been fully integrated into its specification and its security properties have been verified.
+
+The verification time of our full ratcheting protocol is 669.5 seconds, which is around 1.5 times more than the verification time of the original WireGuard implementation.
+This can be explained in part by the fact that the WireGuard specification makes better use of modularity, i.e. is composed of more functions, each with a smaller specification.
+We are confident that one could improve the modularity of our specification and thus reduce its verification time.
+
+
+\begin{figure}
+    \centering
+    \begin{tabular}{@{}llll@{}}
+        \toprule
+        Protocol                 & LOC & LOS  & Verification time {[}s{]} \\ \midrule
+        Full ratcheting protocol & 759 & 6167 & 669.5                     \\
+        WireGuard                & 550 & 5961 & 441.8                     \\
+        \bottomrule
+    \end{tabular}
+    \caption{Lines of code (LOC), lines of specification (LOS) and verification time for the implementations in Gobra of the full ratcheting protocol and the original WireGuard. We have measured the verification time by averaging over 3 runs on a 2020 Apple MacBook Pro with a 4-core Intel Core i5 processor and 16 GB of RAM.}
+    \label{fig:results}
+\end{figure}
+
+
+
