@@ -196,38 +196,40 @@ func ComputeKDFRatchet(k []byte, dhss []byte, ghost currentVersion
 As with any function creating a versioned value in our methodology, it consumes some permission fraction of \texttt{guard} predicate and returns the same amount of \texttt{receipt} for the created value. This ensures the soundness of our deletion mechanism.
 
 Now, we want to define the secrecy label of the resulting KDF.
-The secrecy label of a term is defined by a function \texttt{GetLabel} of the library. It can return a static label depending on the properties of the term, or a label depending on the arguments of the term when the term is a function of other terms. 
-But first, to define a secrecy label for the KDF output, we need the library to \emph{know} about our KDF. While we defined it in the protocol, the KDF function needs to be specified on a term level in the library. We define it as follows:
+The secrecy label of a term is defined by a function \texttt{GetLabel} in the library. It returns a static label depending on the properties of the term, or a label depending on the arguments of the term when the term is a function of other terms, e.g. the hash of a term.
+But first, to define a secrecy label for the KDF output, we need the library to \emph{know} about our KDF. While we defined it in the protocol, the KDF function needs to be specified on the term level in the library. We define it as follows:
 \begin{gobra}
 func KDFRatchet(Term, Term) Term
 \end{gobra}
 We additionally specify some of its properties, like injectivity, through axioms written in the library.
-To then bridge the gap between the protocol and the library definitions, we add to the protocol's \texttt{ComputeKDFRatchet} function a postcondition ensuring that the KDF result corresponds to the byte representation of the library's KDF term.
+To then bridge the gap between the protocol and the library definitions, we add to the protocol's \texttt{ComputeKDFRatchet} function a postcondition ensuring that the KDF result corresponds to the byte representation of the term resulting from applying the newly defined KDF function on the term level.
 
 Now that the library knows about our KDF, we can define its secrecy label.
 Intuitively, the only rule about the secrecy of a KDF output is that it is at most as secure as knowing all of its inputs. Indeed, if you know all the inputs of a KDF, you can compute its output.
-However, the KDF output is not necessarily as secure as its inputs. For example, a \emph{hash} function is a particular key derivation function that is generally used to obtain a public output from a secret input. 
+However, the KDF output is not necessarily as secure as its inputs. For example, a \emph{hash} function behaves similarly to a KDF function and is generally used to obtain a public output from a secret input. 
 Therefore, the secrecy label of the output of a KDF should be weaker or equal to the intersection of the secrecy labels of its inputs.
 
-In our case, the output term \texttt{newk := KDFRatchet(k, dhss)} can have its secrecy label determined by the labels of the previous key \texttt{k} and the Diffie-Hellman shared secret \texttt{dhss}.
-Considering $v$ the current session's version, because the input key $k$ is not $(v+1)$-versioned, it is easy to see that \texttt{newk} cannot obtain a secrecy label containing $(p,s,v+1)$ from \texttt{k} alone.
-Instead, we show that the \texttt{dhss} term has to be $(v+1)$-versioned, which will then allow us to define the secrecy label of \texttt{newk} as being equal to the one of \texttt{dhss} only.
+In our case, we chose to define the secrecy label of the KDF output term \texttt{newk~:= KDFRatchet(k, dhss)} as the secrecy label of the Diffie-Hellman shared secret \texttt{dhss} only.
+% In our case, the output term \texttt{newk := KDFRatchet(k, dhss)} can have its secrecy label determined by the labels of the previous key \texttt{k} and the Diffie-Hellman shared secret \texttt{dhss}.
+Indeed, considering $v$ the current session's version, because the input key $k$ is not $(v+1)$-versioned, it is easy to see that \texttt{newk} cannot obtain a secrecy label containing $(p,s,v+1)$ from \texttt{k} alone.
+Instead, we show that the \texttt{dhss} term has to be $(v+1)$-versioned, therefore making \texttt{newk} $(v+1)$-versioned as well.
+% which will then allow us to define the secrecy label of \texttt{newk} as being equal to the one of \texttt{dhss} only.
 
 The shared secret $\texttt{dhss} = g^{xy}$ is obtained by exponentiating the public key $g^y$ of the other participant with our private key $x$.
 As $x$ is our key, we get to define its secrecy label at creation. 
-In our ratcheting protocol, $x$ is meant to be an ephemeral private used to derive the two next shared communication keys $K$ (the one for receiving and the one for sending), as shown in Figure \ref{fig:dh-ratchet-modified}.
+In our ratcheting protocol, $x$ is meant to be an ephemeral private used to derive the two next shared communication keys $K_n$ and $K_{n+1}$ (the first one for receiving and the other for sending, where $n$ is even and odd for Alice and Bob respectively), as shown in Figure \ref{fig:dh-ratchet-modified}.
 As we want to use $x$ to obtain a shared secret for the next round of communication, we make it readable in version $v+1$. Because any value also needs to be readable in the current version, $x$ is given the label $[(p,s,v),(p,s,v+1)]$, where $p$ and $s$ are the respective participant and session creating $x$.
-From the message invariant, we obtained that $y$ is readable by the other participant $p'$. Because $p$ does not need to know precisely in which session and version $y$ is readable by $p'$, the message invariant only gives us the simplified secrecy label $[(p')]$ for $y$.
-Then, the labeling rules defined in the existing library state that the secrecy label of the shared secret $g^{xy}$ is the junction of $x$ and $y$'s secrecy labels, which is $[(p,s,v),(p,s,v+1),(p')]$.
+From the message invariant, we obtain that $y$ is readable by the other participant $p'$. Because $p$ does not need to precisely know in which session and version $y$ is readable by $p'$, the message invariant only gives us the simplified secrecy label $[(p')]$ for $y$.
+Then, the labeling rules defined in the existing library state that the secrecy label of the shared secret $g^{xy}$ is the union of $x$ and $y$'s secrecy labels, which is $[(p,s,v),(p,s,v+1),(p')]$.
 
 This $(v+1)$-versioned secrecy label of \texttt{dhss} is exactly what we wanted for our \texttt{newk} term.
-The last remaining work is to define the labeling of our \texttt{KDFRatchet} term in the library. 
-For this, we add a postcondition in the library's \texttt{GetLabel(term Term)} function:
+We define the labeling of our \texttt{KDFRatchet} term in the library by stating the following postcondition for the library's \texttt{GetLabel(term Term) (res SecrecyLabel)} function:
 \begin{gobra}
 ensures forall k, dhss Term ::
-    term == KDFRatchet(k, dhss) ==> term == GetLabel(dhss)
+    term == KDFRatchet(k, dhss) ==> res == GetLabel(dhss)
 \end{gobra}
 Therefore, we have adapted our labeling rule and shown that following our ratcheting methodology, we can obtain a $(v+1)$-versioned key from a $v$-versioned key.
+\todo{Make sure the code is on one page only}
 
 \subsection{Usages and message invariants}
 \label{sec:usages-and-message-invariants}
@@ -236,15 +238,15 @@ In section \ref{sec:chosen-protocol}, we discussed how message invariants are cr
 Recall that they are a property proven by the initiator upon AEAD encryption of a message, and obtained by the responder upon AEAD decryption of the received message.
 It is important to note that each \emph{type} of message needs its message invariant.
 In our case, we have several types of messages: a variety of messages used in the IKpsk2 handshake, the message type used in the first communication round, and the message type used in all subsequent rounds in the ratcheting protocol.
-We can put aside the handshake messages as the handshake has already been verified.
+For the handshake messages, we have been able to fully reuse the existing message invariants from the WireGuard implementation, so we will not discuss them further.
 This leaves us with two types of messages to consider.
 % \todo{The truth is that in the end, I used the same message invariant for both types of messages. The following paragraphs however still seem necessary as they explain how I implemented new usages to use the right message invariants.}
 
 Because of these different types of messages and their associated message invariants, we need to be able to distinguish them in the library.
 To do so, the current implementation of the library, similarly to DY*, uses \emph{usage constraints}.
-A usage is a way to annotate a term that should be used for a specific usage.
+A usage is a way to annotate a term that should be used for a specific purpose.
 For example in the case of our ratcheting protocol, we use usages to distinguish Diffie-Hellman private keys, public keys, shared secrets, and $K$ versioned communication keys.
-A usage can initially be defined upon the creation of a value. This is the case when creating a Diffie-Hellman private key.
+A usage can initially be defined upon creation of a value. This is the case when creating a Diffie-Hellman private key.
 But then, similarly to secrecy labels, usages of terms are obtained using a protocol-specific \texttt{GetUsage} function, which can return a usage depending on the arguments of the term when the term is a function of other terms.
 For example, it is in this \texttt{GetUsage} function that we define that the exponentiation of the generator with a key of usage \emph{DH Private Key} has usage \emph{DH Public Key}.
 Similarly, the exponentiation of a key of usage \emph{DH Public Key} with a key of usage \emph{DH Private Key} has usage \emph{DH Shared Secret}.
@@ -254,10 +256,10 @@ Keys used in the first communication round already have a specific usage \texttt
 For subsequent ratcheting keys, we extend the \texttt{GetUsage} function to return a specific usage \texttt{KVersUsage} for keys resulting from the \texttt{KDFRatchet(k, dhss)} function, where \texttt{k} is a key of usage \texttt{KUsage} or \texttt{KVersUsage}, and \texttt{dhss} has a \emph{DH Shared Secret} usage.
 
 To be even more specific about the implementation, we found that it makes verification much easier to distinguish between messages coming from the initiator and messages coming from the responder, and to use slightly different message invariants for each.
-Usage constraints were the natural way to do so, by defining a usage \texttt{KVersIrUsage} for keys used by the initiator, and a usage \texttt{KVersRiUsage} for keys used by the responder (and similarly defining \texttt{KIrUsage} and \texttt{KRiUsage} for the first communication round).
+Usage constraints were the natural way to do so, by defining a usage \texttt{KVersIrUsage} for keys used to encrypt a message sent from the initiator to the responder, and a usage \texttt{KVersRiUsage} for keys used to encrypt a message sent from the responder to the initiator (and similarly defining \texttt{KIrUsage} and \texttt{KRiUsage} for the first communication round).
 
-Ultimately, using usage constraints, we can distinguish between different types of messages upon AEAD encryption and decryption, as well as who is the sender and who is the receiver. This allows us to use a dedicated message invariant for each case.
-
+Ultimately, using usage constraints, we can distinguish between different types of messages upon AEAD encryption and decryption, as well as who is the sender and who is the receiver.
+This simplifies the specification of message invariants because we can distinguish message types and thus separately specify message invariants for each message type.
 
 \subsection{First communication round}
 \label{sec:first-communication-round}
@@ -266,7 +268,9 @@ As shown in Figure \ref{fig:dh-ratchet-modified-first}, the first communication 
 Before it starts, the initiator and responder have a shared secret $K_0$ resulting from WireGuard's handshake.
 The goal of this first round is to send authenticated public keys to each other so that they can start the ratcheting protocol.
 
-The initial key $K_0$, coming from the WireGuard implementation, is not versioned so we will not be forced by the methodology to delete it. As it is only the first key, this will not have a big impact on the security properties of the protocol. However, outside the scope of this thesis, we could imagine implementing a versioned handshake resulting in a versioned $K_0$.
+The initial key $K_0$, coming from the WireGuard implementation, is not versioned so we will not be forced by the methodology to delete it. As it is only the first key, this will not have a big impact on the security properties of the protocol.
+% However, outside the scope of this thesis, we could imagine implementing a versioned handshake resulting in a versioned $K_0$.
+However, by also adapting the handshake and thus increasing verification efforts further, we could consider implementing a versioned handshake resulting in a versioned $K_0$.
 
 But because $K_0$ is not versioned, we do not have a \texttt{receipt} for it.
 This means that we cannot call the \texttt{DeleteSafely} function on it, as it requires such a receipt to consume it.
@@ -279,12 +283,14 @@ This work is explained in the next subsection.
 \subsection{Using the deletion mechanism}
 
 In this section, we explain how we practically comply with the requirements of the deletion mechanism to verify the protocol implementation.
-The first step in this process is to reason about the adequate times to increment the protocol session's version, to ensure that previous keys are deleted.
+The first step in this process is to reason about the adequate times to increment the protocol session's version, at which point previous keys must be deleted.
 This choice will directly impact the resulting security properties of the protocol.
-Indeed, the more frequently we increment the session's version, the more frequently we delete ephemeral keys, and the stronger we expect the security properties to be.
-Of course, there is no point in incrementing the version \emph{too} frequently. As a rule of thumb, if no data has been deleted between two versions, the last version increment was probably not necessary.
+Indeed, the more frequently we increment the session's version, the more we can reason about the temporal existence of keys with a fine granularity, which could lead to tighter security properties.
+% Indeed, the more frequently we increment the session's version, the more frequently we delete ephemeral keys, and the stronger we expect the security properties to be.
+Of course, there is no point in incrementing the version \emph{too} frequently.
+If no data has been deleted between two versions, the last version increment is unnecessary and only results in added verification complexity without benefits.
 
-In the case of our ratcheting protocol, we start by noticing that with the notations of the Figure \ref{fig:dh-ratchet-modified}, for $n>0$, the initiator's private key $x_n$ is used in the computation of the communication keys $K_{2n}$ and $K_{2n+1}$. We can obtain a similar result for the responder.
+In the case of our ratcheting protocol, we notice that with the notations of the Figure \ref{fig:dh-ratchet-modified}, for $n>0$, the initiator's private key $x_n$ is used in the computation of the communication keys $K_{2n}$ and $K_{2n+1}$. We can obtain a similar result for the responder.
 We also notice that we delete a key $K_{2n}$ just after we derive the next key $K_{2n+1}$.
 As a first intuition, it would seem natural to increment the session's version just after we derive $K_{2n+1}$ so that we force the deletion of $K_{2n}$ at this point.
 However, doing so is not possible.
@@ -303,19 +309,20 @@ This way, supposing having $x_{n}$ with secrecy label $[(p,s,n),(p,s,n+1)]$, we 
 Let's increment the session's version at the end of the receive function, before calling the send function, and observe what happens.
 
 We look at the initiator $p$, supposing they are in session $s$ and version $n$, at the beginning of their receive function. We suppose having a private key $x_{n}$ with secrecy label $[(p,s,n),(p,s,n+1)]$, and a previous communication key $K_{2n-1}$ with secrecy label $[(p,s,n-1),(p,s,n),(p')]$.
-As we explained, we first compute the derive key $K_{2n}$ that has a secrecy label $[(p,s,n),(p,s,n+1),(p')]$.
+As we explained, we first compute the key $K_{2n}$ that has a secrecy label $[(p,s,n),(p,s,n+1),(p')]$.
 We can then delete $K_{2n-1}$ as it is not needed anymore.
 Next, we increment the session's version to $n+1$.
-Doing so, the methodology \emph{forced} us to delete $K_{2n-1}$ because it does not flow to version $n+1$.
-We then decrypt the received message and the receive function ends.
+Doing so, the methodology \emph{forces} us to delete $K_{2n-1}$ because it does not flow to version $n+1$.
+We then decrypt the received message using $K_{2n}$ and the receive function ends.
 Now, in the send function, we start by deriving the next communication key $K_{2n+1}$, which has a secrecy label $[(p,s,n),(p,s,n+1),(p')]$, like $K_{2n}$.
 Next, we delete $K_{2n}$ and $x_{n}$, as they are not needed anymore.
 We then compute the next private key $x_{n+1}$, choosing its secrecy label to be $[(p,s,n+1),(p,s,n+2)]$.
 We finish by sending our message encrypted with $K_{2n+1}$, and the send function ends.
-In this case, we were not forced yet to delete $K_{2n}$ and $x_{n}$, because we are still in version $n+1$. The obligation will however come at the end of the next receive, when we will increment the session's version to $n+2$.
-This should be sufficient granularity to later express our security properties.
+In this case, we were not forced yet to delete $K_{2n}$ and $x_{n}$, because we are still in version $n+1$.
+However, we will be forced to delete these two values at the end of the next receive, when we will increment the session's version to $n+2$.
+This granularity should be sufficient to later express our security properties.
 
-Now that we have decided on the granularity of our versioning, it simply remains to follow the requirements of the deletion mechanism that we described in section \ref{sec:extension-of-the-library}.
+Now that we have decided on the granularity of our versioning, we simply follow the requirements of the deletion mechanism that we described in section \ref{sec:extension-of-the-library}.
 These requirements mostly consist of specifying the “correct” amount of \texttt{guard} and \texttt{receipt} permissions in function calls. 
 Additionally, recall the \texttt{ConvertToNextVersion} function introduced in section \ref{sec:conversion-function}.
 The developer will have to convert values labeled with multiple versions (private keys $x$ and communication keys $K$) when necessary, to keep using them in the next session's version.
@@ -347,9 +354,9 @@ func SendMessage(K []byte, privKey []byte, iter int, ghost v uint32,
     \label{lst:send-message}
 \end{figure}
 
-To give a final intuition about the actual reasoning that the developer has to do to comply with the deletion mechanism, we give in Figure \ref{lst:send-message} the preconditions and postconditions relative to the \texttt{guard} and \texttt{receipt} predicates of the initiator's send function.
+To give a final intuition about the actual reasoning that the developer has to do to comply with the deletion mechanism, we give in Figure \ref{lst:send-message} the preconditions and postconditions related to the \texttt{guard} and \texttt{receipt} predicates of the initiator's send function.
 The case \texttt{iter == 0} corresponds to the send operation in the first communication round. Here, a fraction of \texttt{guard(v)}, where $v$ is the current version, is necessary to create the new Diffie-Hellman private key \texttt{newPrivKey}. As it is created with a label $[(p,s,v),(p,s,v+1)]$, we then convert it to the next version $v+1$. This consumes the fraction of \texttt{guard(v+1)} and returns both a fraction of \texttt{receipt(newPrivKey, v+1)} and a fraction of \texttt{guard(v)}.
-The case \texttt{iter == 1} corresponds to the second send operation of the initiator, so to the first send operation of the ratcheting protocol. Compared to previously, we additionally need another \texttt{guard(v)} fraction to consume to compute the initial KDF, which returns a \texttt{receipt(newK, v)} fraction. And we delete the previous private key, consuming the \texttt{receipt(privKey, v)} fraction and returning a \texttt{guard(v)} fraction.
+The case \texttt{iter == 1} corresponds to the second send operation of the initiator, so to the first send operation of the ratcheting protocol. Compared to previously, we additionally need another \texttt{guard(v)} fraction to compute the initial KDF, which in turn returns a \texttt{receipt(newK, v)} fraction. And we delete the previous private key, consuming the \texttt{receipt(privKey, v)} fraction and returning a \texttt{guard(v)} fraction.
 Finally, the case \texttt{iter > 1} is the same as before but with the additional deletion of the previous communication key, consuming the \texttt{receipt(K, v)} fraction and returning an additional \texttt{guard(v)} fraction.
 
 \subsection{Corruption}
