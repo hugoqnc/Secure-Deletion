@@ -4,22 +4,27 @@
 \chapter{Case study}
 \label{chap:case-study}
 
-Now that we have presented our methodology and its implementation in the Reusable Verification Library, we will apply it to a protocol to showcase its use. 
-In this chapter, our goal is to show that the library is now able to verify a protocol whose security properties rely on the frequent deletion of sensitive data.
+Now that we have presented our methodology and its implementation in the Reusable Verification Library, we apply it to a protocol to showcase its use. 
+% In this chapter, our goal is to show that the library is now able to verify a protocol whose security properties rely on the frequent deletion of sensitive data.
+We demonstrate that our implemented deletion mechanism is expressive enough to support a protocol performing key ratcheting.
 
-\todo{Write the outline}
+We start by explaining how we adapted the WireGuard protocol to perform Signal-like key ratcheting.
+Then, we present how we implemented and verified this protocol using our methodology, and the various challenges we faced during this process.
+Finally, we detail the remaining work to achieve the verification of our protocol's security properties.
 
 \section{Choosing a protocol to verify}
 \label{sec:choosing-a-protocol-to-verify}
 
 First, we decide on a protocol to verify.
-We take several criteria into account, which we list here in order of importance.
-First, the protocol must use ephemeral keys that exist only for a short time before being deleted, to satisfy some strong security property.
-Second, we want the protocol to be simple enough to be implemented and verified in a reasonable amount of time. As we only aim to showcase the use of our extended verification library, there is no need to use a state-of-the-art security protocol.
-And third, we want to derive our protocol from an existing one, to show that our library can verify real-world protocols, and not only toy examples.
+We build on the WireGuard protocol to make the verification efforts manageable, as it has already been implemented and verified with the Reusable Verification Library.
+Additionally, we use the Signal protocol as inspiration, as it uses key ratcheting to achieve forward secrecy and post-compromise security, while WireGuard does not.
+% We take several criteria into account, which we list here in order of importance.
+% First, the protocol must use ephemeral keys that exist only for a short time before being deleted, to satisfy some strong security property.
+% Second, we want the protocol to be simple enough to be implemented and verified in a reasonable amount of time. As we only aim to showcase the use of our extended verification library, there is no need to use a state-of-the-art security protocol.
+% And third, we want to derive our protocol from an existing one, to show that our library can verify real-world protocols, and not only toy examples.
 
-In this section, we start by presenting the Diffie-Hellman ratchet, a protocol that checks almost all of our criteria. 
-We continue by introducing a necessary phase of key agreement to obtain the prior knowledge required by such protocol.
+In this section, we start by presenting the Diffie-Hellman ratchet, a protocol that is a core component of Signal's ratcheting process.
+We continue by explaining how we use WireGuard's handshake to obtain the prior knowledge required by the Diffie-Hellman ratchet.
 Finally, we present our final choice of protocol, a modified version of the Diffie-Hellman ratchet, and explain why we made this choice.
 
 \subsection{Ratcheting protocols}
@@ -27,9 +32,9 @@ Finally, we present our final choice of protocol, a modified version of the Diff
 % DH Ratchet, Signal
 
 We have already mentioned the Signal protocol in the previous chapters, which is based on the Double Ratchet algorithm.
-Signal is a state-of-the-art protocol, whose verification of a Go implementation has, to the best of our knowledge, never been attempted.
+Signal is a state-of-the-art protocol, whose verification of a Go implementation\footnote{Note that there is no official Go implementation of Signal, but some unmaintained inofficial implementations exist.} has, to the best of our knowledge, never been attempted.
 However, we do not consider that we have sufficient time to verify such a complex protocol implementation in the scope of this thesis.
-Optimally, we would like to verify a protocol implementation that is simpler than Signal, but uses the same principles of ephemeral keys and ratcheting to achieve comparable security properties.
+Optimally, we would like to verify a protocol implementation that uses the same principles of ephemeral keys and ratcheting to achieve comparable security properties.
 
 Such a protocol exists and has already been introduced in section \ref{sec:diffie-hellman-ratchet}: the Diffie-Hellman (DH) Ratchet.
 Recall that the DH Ratchet is the core component of the Signal protocol. Participants frequently exchange their Diffie-Hellman public keys and use them to obtain a shared secret that is used to derive new ephemeral keys to encrypt their messages.
@@ -37,44 +42,44 @@ The DH Ratchet aims to provide both forward secrecy and post-compromise security
 If the DH Ratchet can provide the same guarantees as the more complex Signal protocol, it is because the DH Ratchet uses a simpler communication model, where participants alternate sending and receiving messages.
 In Signal, the protocol has to cope with a participant sending multiple messages in a row, as well as out-of-order and lost messages.
 
-While the DH Ratchet now appears to be a good candidate for our case study, we have to handle the fact that it requires some prior knowledge, as it was shown in Figure \ref{fig:dh-ratchet}.
+While the DH Ratchet now appears to be a good candidate for our case study, we have to handle the fact that it requires some prior knowledge, as it was shown in Figure \ref{fig:dh-ratchet} page \pageref{fig:dh-ratchet}.
 We need to provide the initiator and responder with a shared secret $K_0$, which will be the initial key of their key chain.
 Additionally, we need to provide the initiator with the public key $g^{y_0}$ of the responder, where $y_0$ is the private of the responder.
 We cannot use the DH Ratchet without this prior knowledge, which requires us to add an initial key agreement to the protocol.
 
-\subsection{Initial key agreement}
-\label{sec:initial-key-agreement}
+\subsection{Initial key agreement and chosen protocol}
+\label{sec:chosen-protocol}
 % X3DH, WireGuard noise's Handshake
 
 Similarly to the Diffie-Hellman Ratchet, the Signal protocol starts with an initial key agreement before running the Double Ratchet algorithm.
 Signal uses the X3DH key agreement protocol, which is a state-of-the-art protocol that provides forward secrecy and cryptographic deniability.
 Additionally, X3DH is specifically designed to work asynchronously when one user is offline.
-Because X3DH is a complex protocol that would require significant time to implement and verify, and because we do not necessarily need all of its strong security properties, we are going to use a simpler protocol.
+% Because X3DH is a complex protocol that would require significant time to implement and verify, and because we do not necessarily need all of its strong security properties, we are going to use a simpler protocol.
+To focus on the ratcheting part of the protocol, we instead pick WireGuard's handshake protocol to perform the initial key agreement, which has already been implemented and verified with the Reusable Verification Library.
+In practice, to build our protocol, we start from the existing WireGuard implementation and change its message transport phase, which currently keeps using the same session key for all messages, to use key ratcheting such that fresh keys are used for each transport message.
 
-We use the fact that the WireGuard protocol has already been implemented and verified with the Reusable Verification Library.
+% We use the fact that the WireGuard protocol has already been implemented and verified with the Reusable Verification Library.
 WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise IKpsk2} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
-\todo{Should I mention the security properties of the handshake (strong/weak forward secrecy)?}
 
-Then, it is easy to add a communication round between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.\todo{This is not really a communication “round” because there is just one message, no response.}
-Therefore, if we combine the IKpsk2 handshake with this additional communication round, we obtain the prior knowledge required by the DH Ratchet.
-At this point, we have a ratcheting protocol that satisfies the three criteria introduced at the beginning of this section. However, we made an additional modification to simplify the verification process.
+Then, it is easy to add a communication step between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.
+Therefore, by combining the IKpsk2 handshake with this additional communication step, we obtain the prior knowledge required by the DH Ratchet.
+At this point, we have already successfully adapted the WireGuard protocol to perform Signal-like key ratcheting.
+However, we explain in the following paragraphs how we made an additional modification to simplify the verification process of this protocol.
 
-\subsection{Chosen protocol}
-\label{sec:chosen-protocol}
-
-As shown in Figure \ref{fig:dh-ratchet}, when the initiator sends a message encrypted by a key $K_1$ to the responder together with its new public key $g^{x_1}$, the responder uses this public key $g^{x_1}$ to compute the shared secret $K_1$ and decrypt the message.
+Recall the original ratcheting process that we presented in Figure \ref{fig:dh-ratchet} (page \pageref{fig:dh-ratchet}); when the initiator sends a message encrypted by a key $K_1$ to the responder together with its new public key $g^{x_1}$, the responder uses this public key $g^{x_1}$ to compute the shared secret $K_1$ and decrypt the message.
 Typically, the public key $g^{x_1}$ is sent in the associated data of the AEAD encrypted message, so its integrity is protected, but it remains publicly readable so the responder can immediately access it to compute $K_1$.
 
-In the existing methodology and its current implementation, the Reusable Verification Library, the message comes with a ghost \emph{message invariant}. It is a property, part of the trace invariant, about the content of the message used for verification purposes. Upon encrypting the message to send, the initiator has to prove this message invariant, and upon receiving and decrypting the message, the responder can either assume the message invariant or know that corruption has occurred.
-In our case, for the first message sent by the initiator on Figure \ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would contain that $g^{x_1}$ is an exponential with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
+In the existing methodology and its current implementation, the Reusable Verification Library, the message comes with a (ghost) \emph{message invariant}. It is a property, part of the trace invariant, about the content of the message used for verification purposes. Upon encrypting the message to send, the initiator has to prove this message invariant, and upon receiving and decrypting the message, the responder obtains the message invariant unless corruption has occurred, in which case the message was potentially sent by the attacker.
+In our case, for the first message sent by the initiator on Figure \ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would specify that $g^{x_1}$ is a Diffie-Hellman public key with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
 This information can then be used for verification purposes on the responder side, notably to know that $g^{x_1y_0}$ is a Diffie-Hellman shared secret.
 
-However, in our case, it is a problem that the message invariant is obtained only \emph{after} decryption of the message because we would need to know that $g^{x_1y_0}$ is a shared secret \emph{before} decryption to be able to decrypt the message.
-Indeed, the decryption function requires us to prove that $K_1$ is a valid AEAD decryption key, which we can only know if we know that $g^{x_1y_0}$ is a shared secret.
+However, in our case, the message invariant is obtained only \emph{after} decrypting the message.
+However, we would need to know that $g^{x_1y_0}$ is a shared secret \emph{before} decrypting to satisfy the preconditions of the decryption function.
+In particular, the decryption function requires us to prove that $K_1$ is a valid AEAD decryption key, which in turn requires us to know that $g^{x_1y_0}$ is a shared secret.
 
-This is why we decided to slightly modify the DH Ratchet protocol to make it verifiable with our existing methodology and library.
+This is why we slightly modified the DH Ratchet protocol to make it verifiable with our existing methodology and library.
 We present our modified protocol in Figure \ref{fig:dh-ratchet-modified}, and our new first communication round (running after the IKpsk2 handshake) in Figure \ref{fig:dh-ratchet-modified-first}.
-For the sake of readability, we will now refer in all future parts to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, e.g. the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
+For the sake of readability, we now refer in the remainder of the thesis to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, i.e. the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
 
 \begin{figure}
     \centering
@@ -91,10 +96,10 @@ For the sake of readability, we will now refer in all future parts to our modifi
 \end{figure}
 \todo{Change the figures \ref{fig:dh-ratchet-modified} and \ref{fig:dh-ratchet-modified-first} to use cleaner ones, and modify the caption to explain the figures more in detail}
 
-The intuition behind the ratcheting protocol is that we replicate the DH Ratchet protocol, but instead of using the just-received public key to compute the shared secret used in the message decryption, we use the public key received in the previous message.
-This first requires us to modify the prior knowledge of the participants. Now, in addition to the initial shared secret $K_0$, both participants need to know the other's public key and their private key.
+The intuition behind the ratcheting protocol is that we replicate the DH Ratchet protocol, but instead of using the just-received public key, we use the public key received in the previous message to compute the shared secret.
+This first requires us to modify the prior knowledge of the participants. Now, in addition to the initial shared secret $K_0$, both participants need to know the other's DH public key and their (versioned) DH private key.
 This is the purpose of the new first communication round shown in Figure \ref{fig:dh-ratchet-modified-first}. 
-The initiator first sends its public key $g^{x_0}$ to the responder, authenticated with the symmetric key established by the handshake. Then, the responder replies with its authenticated public key $g^{y_0}$.
+The initiator first sends its public key $g^{x_0}$ to the responder, authenticated with the symmetric key $K_{IR}$ established by the handshake. Then, the responder replies with its authenticated public key $g^{y_0}$.
 
 Coming back to the ratcheting protocol shown in Figure \ref{fig:dh-ratchet-modified}, when computing the first shared secret $K_1$, the initiator uses its private key $x_0$, whose associated public key $g^{x_0}$ is already known by the responder, from the first communication round.
 This was not the case in the DH Ratchet protocol.
@@ -152,10 +157,15 @@ We will now present how we implemented and verified this protocol using our meth
 
 This section explains how we implemented and verified the full ratcheting protocol presented in the previous section.
 We started the implementation on top of the existing WireGuard implementation, which already implements the IKpsk2 handshake.
-The remaining work was to implement the first communication round and the ratcheting protocol.
+Our focus was on adapting the message transport phase to use the ratcheting protocol.
+% The remaining work was to implement the first communication round and the ratcheting protocol.
 In particular, the implementation work shed light on additional challenges related to the verification library. This section describes these challenges and how we solved them.
 
-\todo{Write the outline}
+We start by explaining how we were able to model key ratcheting with our methodology.
+Then, we present how we used usage constraints to distinguish between different types of messages and their associated message invariants.
+Next, we focus on the first communication round and explain its specificities in terms of verification.
+Afterward, we describe how we added verification annotations to comply with the requirements of our deletion mechanism when verifying the ratcheting protocol.
+Finally, we explain how corruption is handled in the methodology and how we can integrate it into our verification annotations.
 
 \subsection{Ratcheting using a key derivation function}
 \label{sec:ratcheting-using-a-key-derivation-function}
@@ -353,6 +363,7 @@ For example, to define post-compromise security, we have to express that an atta
 In the Reusable Verification Library, corruption is observable upon receiving and decrypting an AEAD encrypted message. 
 Recall from section \ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender.
 To be exact, we either obtain this message invariant, or we do not and we thus learn that the message comes from the attacker.
+\todo{We have already explained this disjunction before}
 In the latter case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
 
 Coming back to our ratcheting protocol, we have seen in the previous section that an ephemeral communication key has a secrecy label of the form $[(p,s,v),(p,s,v+1),(p')]$, where $v$ is the current version of session $s$.
