@@ -1,13 +1,9 @@
-# Thesis Template
+# Secure Deletion of Sensitive Data in Protocol Implementations
+**Hugo Queinnec, 2023**
 
-[![build status](/../badges/master/build.svg)](/../commits/master)
-
-Quick links:
-
-*   [Download](/../-/jobs/artifacts/master/raw/description/description.pdf?job=build) project description.
-*   [Download](/../-/jobs/artifacts/master/raw/report/thesis.pdf?job=build) thesis report.
-
-Welcome! This repository contains templates for the project
-[description](description) and [report](report) (taken from
-[here](https://www.cadmo.ethz.ch/education/thesis/template.html)). Feel
-free to adapt them to your needs. 
+This repo contains the source code associated to this Master's thesis, as well as the Latex source files of the project description and the final report.
+It is organized as follows:
+- [`library`](./library/) contains the source code of the extended Reusable Verification Library in Go.
+- [`ratcheting-protocol`](./ratcheting-protocol) contains the source code of the full ratcheting protocol implementation (and specification) in Go. As explained in the report, this implementation is not yet complete.
+- [`report`](./report/) contains the Latex source files of the final report.
+- [`description`](./description/) contains the Latex source files of the project description.

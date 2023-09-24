@@ -1,0 +1,97 @@
+package trace
+
+
+import . github.com/ModularVerification/ReusableVerificationLibrary/event
+
+import github.com/ModularVerification/ReusableVerificationLibrary/label
+
+import p github.com/ModularVerification/ReusableVerificationLibrary/principal
+
+import tm github.com/ModularVerification/ReusableVerificationLibrary/term
+
+import u github.com/ModularVerification/ReusableVerificationLibrary/usage
+type TraceEntry domain {
+  func makeRoot(set[tm.Term]) (TraceEntry)
+  func makeEvent(TraceEntry, p.Principal, Event) (TraceEntry)
+  func makeMessage(TraceEntry, p.Principal, p.Principal, tm.Term) (TraceEntry)
+  func makeDropMessage(TraceEntry, p.Principal, p.Principal, tm.Term) (TraceEntry)
+  func makeNonce(TraceEntry, tm.Term) (TraceEntry)
+  func makePublic(TraceEntry, tm.Term) (TraceEntry)
+  func makeCorrupt(TraceEntry, p.Id) (TraceEntry)
+  func getPrev(TraceEntry) (TraceEntry)
+  func getPublicTerms(TraceEntry) (set[tm.Term])
+  func getPrincipal(TraceEntry) (p.Principal)
+  func getEvent(TraceEntry) (Event)
+  func getSender(TraceEntry) (p.Principal)
+  func getReceiver(TraceEntry) (p.Principal)
+  func getPayload(TraceEntry) (tm.Term)
+  func getNonce(TraceEntry) (tm.Term)
+  func getId(TraceEntry) (p.Id)
+  func getType(TraceEntry) (int)
+  axiom {
+    forall t: TraceEntry :: {getType(t)} 0 <= getType(t) && getType(t) <= 6
+  }
+  axiom {
+    forall terms: set[tm.Term] :: {makeRoot(terms)} getType(makeRoot(terms)) == 0 && getPublicTerms(makeRoot(terms)) == terms
+  }
+  axiom {
+    forall prev: TraceEntry, principal: p.Principal, ev: Event :: {makeEvent(prev, principal, ev)} getType(makeEvent(prev, principal, ev)) == 1 && getPrev(makeEvent(prev, principal, ev)) == prev && getPrincipal(makeEvent(prev, principal, ev)) == principal && getEvent(makeEvent(prev, principal, ev)) == ev
+  }
+  axiom {
+    forall prev: TraceEntry, sender: p.Principal, receiver: p.Principal, payload: tm.Term :: {makeMessage(prev, sender, receiver, payload)} getType(makeMessage(prev, sender, receiver, payload)) == 2 && getPrev(makeMessage(prev, sender, receiver, payload)) == prev && getSender(makeMessage(prev, sender, receiver, payload)) == sender && getReceiver(makeMessage(prev, sender, receiver, payload)) == receiver && getPayload(makeMessage(prev, sender, receiver, payload)) == payload
+  }
+  axiom {
+    forall prev: TraceEntry, sender: p.Principal, receiver: p.Principal, payload: tm.Term :: {makeDropMessage(prev, sender, receiver, payload)} getType(makeDropMessage(prev, sender, receiver, payload)) == 3 && getPrev(makeDropMessage(prev, sender, receiver, payload)) == prev && getSender(makeDropMessage(prev, sender, receiver, payload)) == sender && getReceiver(makeDropMessage(prev, sender, receiver, payload)) == receiver && getPayload(makeDropMessage(prev, sender, receiver, payload)) == payload
+  }
+  axiom {
+    forall prev: TraceEntry, nonce: tm.Term :: {makeNonce(prev, nonce)} getType(makeNonce(prev, nonce)) == 4 && getPrev(makeNonce(prev, nonce)) == prev && getNonce(makeNonce(prev, nonce)) == nonce
+  }
+  axiom {
+    forall prev: TraceEntry, publicTerm: tm.Term :: {makePublic(prev, publicTerm)} getType(makePublic(prev, publicTerm)) == 5 && getPrev(makePublic(prev, publicTerm)) == prev && getPayload(makePublic(prev, publicTerm)) == publicTerm
+  }
+  axiom {
+    forall prev: TraceEntry, id: p.Id :: {makeCorrupt(prev, id)} getType(makeCorrupt(prev, id)) == 6 && getPrev(makeCorrupt(prev, id)) == prev && getId(makeCorrupt(prev, id)) == id
+  }
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isRoot() (res bool) {
+  return getType(entry) == 0
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isEvent() (res bool) {
+  return getType(entry) == 1
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isMessage() (bool) {
+  return getType(entry) == 2
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isDropMessage() (bool) {
+  return getType(entry) == 3
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isNonce() (bool) {
+  return getType(entry) == 4
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isPublic() (bool) {
+  return getType(entry) == 5
+}
+
+ghost pure
+decreases  
+func (entry TraceEntry) isCorrupt() (bool) {
+  return getType(entry) == 6
+}
