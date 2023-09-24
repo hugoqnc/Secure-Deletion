@@ -236,13 +236,13 @@ Therefore, we have adapted our labeling rule and shown that following our ratche
 
 In section \ref{sec:chosen-protocol}, we discussed how message invariants are crucial to the verification of our ratcheting protocol.
 Recall that they are a property proven by the initiator upon AEAD encryption of a message, and obtained by the responder upon AEAD decryption of the received message.
-It is important to note that each \emph{type} of message needs its message invariant.
-In our case, we have several types of messages: a variety of messages used in the IKpsk2 handshake, the message type used in the first communication round, and the message type used in all subsequent rounds in the ratcheting protocol.
+It is important to note that each kind of message needs its message invariant.
+In our case, we have several kinds of messages: a variety of messages used in the IKpsk2 handshake, the messages used in the first communication round, and the messages used in all subsequent rounds in the ratcheting protocol.
 For the handshake messages, we have been able to fully reuse the existing message invariants from the WireGuard implementation, so we will not discuss them further.
-This leaves us with two types of messages to consider.
+This leaves us with two kinds of messages to consider.
 % \todo{The truth is that in the end, I used the same message invariant for both types of messages. The following paragraphs however still seem necessary as they explain how I implemented new usages to use the right message invariants.}
 
-Because of these different types of messages and their associated message invariants, we need to be able to distinguish them in the library.
+Because of these different kinds of messages and their associated message invariants, we need to be able to distinguish them in the library.
 To do so, the current implementation of the library, similarly to DY*, uses \emph{usage constraints}.
 A usage is a way to annotate a term that should be used for a specific purpose.
 For example in the case of our ratcheting protocol, we use usages to distinguish Diffie-Hellman private keys, public keys, shared secrets, and $K$ versioned communication keys.
@@ -251,15 +251,15 @@ But then, similarly to secrecy labels, usages of terms are obtained using a prot
 For example, it is in this \texttt{GetUsage} function that we define that the exponentiation of the generator with a key of usage \emph{DH Private Key} has usage \emph{DH Public Key}.
 Similarly, the exponentiation of a key of usage \emph{DH Public Key} with a key of usage \emph{DH Private Key} has usage \emph{DH Shared Secret}.
 
-Coming back to the two types of messages in our ratcheting protocol that we need to distinguish, we use usages to do so.
+Coming back to the two kinds of messages in our ratcheting protocol that we need to distinguish, we use usages to do so.
 Keys used in the first communication round already have a specific usage \texttt{KUsage} that they obtained at the end of the handshake.
 For subsequent ratcheting keys, we extend the \texttt{GetUsage} function to return a specific usage \texttt{KVersUsage} for keys resulting from the \texttt{KDFRatchet(k, dhss)} function, where \texttt{k} is a key of usage \texttt{KUsage} or \texttt{KVersUsage}, and \texttt{dhss} has a \emph{DH Shared Secret} usage.
 
 To be even more specific about the implementation, we found that it makes verification much easier to distinguish between messages coming from the initiator and messages coming from the responder, and to use slightly different message invariants for each.
 Usage constraints were the natural way to do so, by defining a usage \texttt{KVersIrUsage} for keys used to encrypt a message sent from the initiator to the responder, and a usage \texttt{KVersRiUsage} for keys used to encrypt a message sent from the responder to the initiator (and similarly defining \texttt{KIrUsage} and \texttt{KRiUsage} for the first communication round).
 
-Ultimately, using usage constraints, we can distinguish between different types of messages upon AEAD encryption and decryption, as well as who is the sender and who is the receiver.
-This simplifies the specification of message invariants because we can distinguish message types and thus separately specify message invariants for each message type.
+Ultimately, using usage constraints, we can distinguish between different kinds of messages upon AEAD encryption and decryption, and identify messages coming from the initiator or the responder.
+This simplifies the specification of message invariants because we can distinguish between messages and thus separately specify message invariants for kind of each message.
 
 \subsection{First communication round}
 \label{sec:first-communication-round}
@@ -431,13 +431,14 @@ $K_n$ remains secret unless the attacker compromises the version $v$ or $v+1$ of
 
 However, our secrecy property is currently weaker than it could be, as the secrecy label of $K_n$ contains $p'$, which expresses that $K_n$ can be obtained by the attacker if they compromise $p'$ at any time.
 This property could be strengthened, as we can intuitively see that $K_n$ is also available in only two versions of a session $s'$ of $p'$.
-We leave it to future work to show that the secrecy label of $K_n$ can be strengthened to $[(p,s,v),(p,s,v+1),(p',s',v'),(p',s',v'+1)]$.
+We leave it to future work to show that, when $p$ is the initiator and for $n>0$, the secrecy label of $K_{2n}$ can be strengthened to $[(p,s,n),(p,s,n+1),(p',s',n-1),(p',s',n)]$ and the secrecy label of $K_{2n+1}$ can be strengthened to $[(p,s,n),(p,s,n+1),(p',s',n),(p',s',n+1)]$.
 Showing this requires tightening the message invariant that we initially introduced in section \ref{sec:ratcheting-using-a-key-derivation-function}. 
 
 % This means that $K_n$ remains secret even if the attacker compromises a version $v_{corrupted} \in \mathbb{N} \setminus \{v, v+1\}$ of the session $s$ of participant $p$, or a version $v'_{corrupted} \in \mathbb{N} \setminus \{v', v'+1\}$ of the session $s'$ of participant $p'$.
-Then, we can express that the key $K_n$ remains secret unless the previous key $K_{n-1}$ was made public before $K_n$ was computed, or unless the attacker compromises a version $v$ or $v+1$ of the session $s$ of participant $p$, or a version $v'$ or $v'+1$ of the session $s'$ of participant $p'$.
-Indeed, if the attacker compromises $K_{n-1}$ before $K_n$ is computed, they could impersonate a protocol participant and eventually obtain $K_n$.
-This secrecy property expresses both forward secrecy and post-compromise security for our ratcheting protocol.
+Then, we can express that the key $K_{2n+1}$ remains secret unless the previous key $K_{2n}$ was made public before $K_{2n+1}$ was computed, or unless the attacker compromises a version $n$ or $n+1$ of the session $s$ of participant $p$ or of the session $s'$ of participant $p'$.
+Indeed, if the attacker compromises $K_{2n}$ before $K_{2n+1}$ is computed, they could impersonate a protocol participant and eventually obtain $K_{2n+1}$.
+Similarly, we express that a key $K_{2n}$ remains secret unless the previous key $K_{2n-1}$ was made public before $K_{2n}$ was computed, or unless the attacker compromises a version $n$ or $n+1$ of the session $s$ of participant $p$ or a version $n-1$ or $n$ of the session $s'$ of participant $p'$.
+Overall, these secrecy properties express both forward secrecy and post-compromise security for our ratcheting protocol.
 
 To sum up, we have shown the path to complete the verification of our protocol's security properties.
 This will require some modifications to existing annotations, including strengthening the message invariant and probably writing additional lemmas. 
@@ -451,11 +452,13 @@ The number of lines of specification does not count the lines of the Reusable Ve
 This is justified because the library is protocol-independent and can be verified once and for all.
 
 Our full ratcheting protocol is composed of 759 lines of code and 6167 lines of specification, which is around 8.1 times more specification than code.
-In comparison, the original WireGuard implementation is composed of around 10.8 times more specification than code, but corruption has been fully integrated into its specification and its security properties have been verified.
+However, note that the verification of the full ratcheting protocol is not complete yet and we thus expect a slightly higher ratio of specification to code once it is.
+In comparison, the original WireGuard implementation is composed of around 9.8 times more specification than code, but corruption has been fully integrated into its specification and its security properties have been verified.
 
 The verification time of our full ratcheting protocol is 669.5 seconds, which is around 1.5 times more than the verification time of the original WireGuard implementation.
-This can be explained in part by the fact that the WireGuard specification makes better use of modularity, i.e. is composed of more functions, each with a smaller specification.
-We are confident that one could improve the modularity of our specification and thus reduce its verification time.
+This can be explained in part because our full ratcheting protocol contains additional specifications related to our deletion mechanism, which is not present in the original WireGuard implementation.
+% the fact that the WireGuard specification makes better use of modularity, i.e. is composed of more functions, each with a smaller specification.
+% We are confident that one could improve the modularity of our specification and thus reduce its verification time.
 
 
 \begin{figure}
@@ -464,10 +467,10 @@ We are confident that one could improve the modularity of our specification and 
         \toprule
         Protocol                 & LOC & LOS  & Verification time {[}s{]} \\ \midrule
         Full ratcheting protocol & 759 & 6167 & 669.5                     \\
-        WireGuard                & 550 & 5961 & 441.8                     \\
+        WireGuard                & 550 & 5411 & 441.8                     \\
         \bottomrule
     \end{tabular}
-    \caption{Lines of code (LOC), lines of specification (LOS) and verification time for the implementations in Gobra of the full ratcheting protocol and the original WireGuard. We have measured the verification time by averaging over 3 runs on a 2020 Apple MacBook Pro with a 4-core Intel Core i5 processor and 16 GB of RAM.}
+    \caption{Lines of code (LOC), lines of specification (LOS) and verification time for the implementations in Gobra of the full ratcheting protocol and the original WireGuard. The numbers for the latter are provided for reference because the full ratcheting protocol builds on top of the original WireGuard protocol. We have measured the verification time by averaging over 3 runs on a 2020 Apple MacBook Pro with a 4-core Intel Core i5 processor and 16 GB of RAM.}
     \label{fig:results}
 \end{figure}
 

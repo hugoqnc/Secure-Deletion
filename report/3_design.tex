@@ -167,8 +167,7 @@ Note that with this approach, one could think that the developer could just neve
 
 Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions \cite{}.
 % In this section, we build our method on the same intuition as the approach explained above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
-While counting permissions follow a similar idea as a counter, they overcome the limitations mentioned earlier and are suitable for our use case, i.e., supporting arbitrary representations of application state and supporting concurrency.
-\todo{Do they really support concurrency? See after}
+While counting permissions follow a similar idea as a counter, they overcome the limitations mentioned earlier and are suitable for our use case, i.e. they support arbitrary representations of the application state and can be adapted to support concurrency.
 
 We start by introducing the notion of counting permissions.
 Because this permission model is not available in the current version of Gobra, we then explain how we can obtain similar functionality using the existing permission system.
@@ -188,10 +187,11 @@ Unversioned values do not need to be tracked as they do not have to be safely de
 To implement a deletion mechanism using the counting permissions model, we use an abstract predicate that we call \texttt{guard(i int)}, which takes a version number as an argument, and on which we initially have full permission $0$. The library functions that create a versioned term readable in version $i$ require access to the token factory $n\geq0$ of \texttt{guard(i)}, and return an incremented share $n+1$, \emph{without} returning the token bundle $-1$. Invertly, the secure deletion function returns a token bundle $-1$ upon deletion of a versioned term readable in version $i$. Therefore, if the developer deletes all $i$-versioned terms, they will obtain as many token bundles $-1$ as the value of the token factory $n$. Summing them together will result in a full permission $n = 0$. This means that we know that no $i$-versioned values exist in memory when we have full permission on \texttt{guard(i)}.
 
 The major difference with a simple counter variable is that the developer \emph{cannot} create a $-1$ token bundle the way they could just decrement the counter variable. They \emph{have to} delete all $i$-versioned terms and cannot circumvent the deletion mechanism.
-\todo{I may transition by saying that counting permissions may not trivially support concurrency, but the approach we introduce next does.}
 
-% To support concurrency, we could protect the token factory with a lock.
-% Then, splitting the factory to obtain a bundle, or summing the factory with a bundle, would require acquiring the lock.
+To support concurrency using counting permissions, we could protect the token factory with a (ghost) lock.
+Then, splitting the factory to obtain a bundle, or summing the factory with a bundle, would require acquiring the lock.
+This lock would however complicate the entire reasoning as the lock and each thread would have to be aware of the amount of created versioned values.
+Thus, in the next section, we present an alternative to counting permissions that, in addition to supporting concurrency without a lock, is supported by Gobra.
 
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
@@ -243,6 +243,9 @@ The following lemma expresses this property:
 \end{lemma}
 
 Consequently, we require full permission on \texttt{guard(v)} to call the function that increments the version of the session.
+
+Additionally, this approach naturally supports concurrency, because separation logic allows us to split the permission of the \texttt{guard} predicate into several fractions and hand each fraction to a different thread.
+Doing so, each thread can independently perform creation and deletion operations on versioned values because they only require a fraction of the permission of the \texttt{guard} predicate.
 
 Similarly to counting permissions, the developer cannot bypass the deletion mechanism because he cannot obtain \texttt{guard} or \texttt{receipt} fractional permissions without going through the library functions.
 This is assuming that the developer does not use Gobra's \texttt{inhale} statement to bypass the permission system.
@@ -449,8 +452,9 @@ But as discussed in section \ref{sec:choosing-the-right-permission-amounts}, it 
 Additionally, \texttt{DeleteSafely} consumes the memory predicate of the deleted value (line 3), expressing that the value is no longer stored in memory.
 
 To securely erase a value from memory, we use the implementation shown in lines 7-12 of Figure \ref{lst:delete-safely}.
-This ensures that the memory is zeroed out, and line 12 seems sufficient to prevent the Go compiler from eliminating the function's body.
-\todo{Paper to cite here?}
+This ensures that the memory is zeroed out and that this operation is not optimized away by the compiler.
+Line 12 currently seems sufficient to prevent the Go compiler from eliminating the function's body.
+Various alternatives have been surveyed by Yang et al. \cite{} for the C language.
 
 \subsection{Creating values with multiple versions for ratcheting}
 \label{sec:creating-values-with-multiple-versions-for-ratcheting}
@@ -510,7 +514,7 @@ Because a session's version is initialized at $0$, it implies giving the develop
 
 Some parts of the implementation of our deletion mechanism rely on the existence of a single \texttt{guard(v)} predicate, where $v$ is necessarily the current version of the session.
 In particular, some helper functions that play a role in the deletion mechanism do not have access to the session state, so do not know the current version.
-In these cases, \texttt{guard(v)} can be used to hand them the current version.
+In these cases, \texttt{guard(v)} can be used to bind the current version \texttt{v} to the function's argument.
 % It is then handy to give them access to a \texttt{guard(v)} permission fraction, so they know that $v$ is the current version.
 % For example, the body of \texttt{CreateNonce} calls a trusted implementation, called \texttt{CreateNonceImpl}, which generates a random nonce and stores it in a byte array.
 % As this implementation is in the library, we want to prevent the developer from calling it with arguments that would compromise the soundness of the methodology.
