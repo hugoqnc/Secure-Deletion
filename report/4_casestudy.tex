@@ -56,7 +56,7 @@ Signal uses the X3DH~\cite{marlinspike2016x3dh} key agreement protocol, which is
 Additionally, X3DH is specifically designed to work asynchronously when one user is offline.
 % Because X3DH is a complex protocol that would require significant time to implement and verify, and because we do not necessarily need all of its strong security properties, we are going to use a simpler protocol.
 To focus on the ratcheting part of the protocol, we instead pick WireGuard's handshake protocol to perform the initial key agreement, which has already been implemented and verified with the Reusable Verification Library.
-In practice, to build our protocol, we start from the existing WireGuard implementation and change its message transport phase, which currently keeps using the same session key for all messages, to use key ratcheting such that fresh keys are used for each transport message.
+In practice, to build our protocol, we start from the existing WireGuard implementation and change its message transport phase, which currently keeps using the same session key for all messages, to use key ratcheting instead such that fresh keys are used for each transport message.
 
 % We use the fact that the WireGuard protocol has already been implemented and verified with the Reusable Verification Library.
 WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise IKpsk2}~\cite{perrin2018noise} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
@@ -79,14 +79,14 @@ In particular, the decryption function requires us to prove that $K_1$ is a vali
 
 This is why we slightly modified the DH Ratchet protocol to make it verifiable with our existing methodology and library.
 We present our modified protocol in Figure~\ref{fig:dh-ratchet-modified}, and our new first communication round (running after the IKpsk2 handshake) in Figure~\ref{fig:dh-ratchet-modified-first}.
-For the sake of readability, we now refer in the remainder of the thesis to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, i.e. the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
+For the sake of readability, we now refer in the remainder of the thesis to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, i.e.\ the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
 
 \begin{figure}
     \centering
     \includegraphics[width=1.0\textwidth]{figures/DH-ratchet-modified.png}
     \caption{Our \emph{ratcheting protocol}: a modified protocol based on the Diffie-Hellman Ratchet, in which the decryption key is computed using the previous DH public key instead of the just-received one.
     Here, \texttt{AeadEnc(K, MSG, ad)} refers to the AEAD encryption of the message \texttt{MSG} with the key \texttt{K} and the associated data \texttt{ad}. \texttt{KDF(a, b)} refers to a key derivation function that derives a new key from two inputs \texttt{a} and \texttt{b}.
-    Green bubbles are linked to versioned values, and the numbers in the bubble indicate the versions in which the value can be read from the participant's point of view. For example, the top-left bubble indicates that $x_0$ can be read in versions $0$ and $1$ of Alice's current session.}
+    Green bubbles, which are linked to versioned values, indicate with their numbers the versions in which the value can be read from the participant's point of view. For example, the top-right bubble indicates that $y_0$ can be read in versions $0$ and $1$ of Bob's current session.}
     \label{fig:dh-ratchet-modified}
 \end{figure}
 
@@ -97,7 +97,7 @@ For the sake of readability, we now refer in the remainder of the thesis to our 
     It uses the shared keys $K_{IR}$ and $K_{RI}$ established by the handshake to authenticate the DH public keys $g^{x_0}$ and $g^{y_0}$ of the initiator and responder respectively.
     This exchange of public keys is necessary to initiate the ratcheting protocol, as it provides the required prior knowledge.
     \texttt{AeadEnc(K, MSG, ad)} refers to the AEAD encryption of the message \texttt{MSG} with the key \texttt{K} and the associated data \texttt{ad}.
-    Like in Figure~\ref{fig:dh-ratchet-modified}, green bubbles are linked to versioned values, and the numbers in the bubble indicate the versions in which the value can be read from the participant's point of view.
+    Like in Figure~\ref{fig:dh-ratchet-modified}, green bubbles, which are linked to versioned values, indicate with their numbers the versions in which the value can be read from the participant's point of view.
     }
     \label{fig:dh-ratchet-modified-first}
 \end{figure}
@@ -202,7 +202,7 @@ func ComputeKDFRatchet(k []byte, dhss []byte, ghost currentVersion
 As with any function creating a versioned value in our methodology, it consumes some permission fraction of \texttt{guard} predicate and returns the same amount of \texttt{receipt} for the created value. This ensures the soundness of our deletion mechanism.
 
 Now, we want to define the secrecy label of the resulting KDF.
-The secrecy label of a term is defined by a function \texttt{GetLabel} in the library. It returns a static label depending on the properties of the term, or a label depending on the arguments of the term when the term is a function of other terms, e.g. the hash of a term.
+The secrecy label of a term is defined by a function \texttt{GetLabel} in the library. It returns a static label depending on the properties of the term, or a label depending on the arguments of the term when the term is a function of other terms, e.g.\  the hash of a term.
 But first, to define a secrecy label for the KDF output, we need the library to \emph{know} about our KDF. While we defined it in the protocol, the KDF function needs to be specified on the term level in the library. We define it as follows:
 \begin{gobra}
 func KDFRatchet(Term, Term) Term
@@ -229,13 +229,12 @@ From the message invariant, we obtain that $y$ is readable by the other particip
 Then, the labeling rules defined in the existing library state that the secrecy label of the shared secret $g^{xy}$ is the union of $x$ and $y$'s secrecy labels, which is $[(p,s,v),(p,s,v+1),(p')]$.
 
 This $(v+1)$-versioned secrecy label of \texttt{dhss} is exactly what we wanted for our \texttt{newk} term.
-We define the labeling of our \texttt{KDFRatchet} term in the library by stating the following postcondition for the library's \texttt{GetLabel(term Term) (res SecrecyLabel)} function:
+We define the labeling of our \texttt{KDFRatchet} term in the library by stating the following postcondition for the library's \texttt{GetLabel(term Term) (res SecrecyLabel)} function:\\% This line jump is necessary to avoid a bad page break
 \begin{gobra}
 ensures forall k, dhss Term ::
     term == KDFRatchet(k, dhss) ==> res == GetLabel(dhss)
 \end{gobra}
 Therefore, we have adapted our labeling rule and shown that following our ratcheting methodology, we can obtain a $(v+1)$-versioned key from a $v$-versioned key.
-\todo{Make sure the code is on one page only}
 
 \subsection{Usages and message invariants}
 \label{sec:usages-and-message-invariants}
@@ -271,17 +270,19 @@ This simplifies the specification of message invariants because we can distingui
 \label{sec:first-communication-round}
 
 As shown in Figure~\ref{fig:dh-ratchet-modified-first}, the first communication round is a little different from the other rounds.
-Before it starts, the initiator and responder have a shared secret $K_0$ resulting from WireGuard's handshake.
+Before it starts, the initiator and responder have shared secrets $K_{IR}$ and $K_{RI}$ resulting from WireGuard's handshake.
 The goal of this first round is to send authenticated public keys to each other so that they can start the ratcheting protocol.
+The ratcheting protocol also requires a shared secret $K_0$ as prior knowledge, which is defined in the first communication round as $K_0 = K_{IR}$.
 
-The initial key $K_0$, coming from the WireGuard implementation, is not versioned so we will not be forced by the methodology to delete it. As it is only the first key, this will not have a big impact on the security properties of the protocol.
+This initial key $K_0$, coming from the WireGuard implementation, is not versioned so we will not be forced by the methodology to delete it. As it is only the first key, this will not have a big impact on the security properties of the protocol.
 % However, outside the scope of this thesis, we could imagine implementing a versioned handshake resulting in a versioned $K_0$.
 However, by also adapting the handshake and thus increasing verification efforts further, we could consider implementing a versioned handshake resulting in a versioned $K_0$.
 
 But because $K_0$ is not versioned, we do not have a \texttt{receipt} for it.
 This means that we cannot call the \texttt{DeleteSafely} function on it, as it requires such a receipt to consume it.
 This has an impact on the second communication round, more particularly on the initiator's first send and the responder's first receive of the ratcheting protocol, shown in Figure~\ref{fig:dh-ratchet-modified}.
-Indeed, these functions were the ones supposed to delete $K_0$ if it was versioned.
+% Indeed, these functions were the ones supposed to delete $K_0$ if it was versioned.
+Indeed, these functions are deleting $K_0$, but they do not use the particular \texttt{DeleteSafely} function that is meant to delete versioned values.
 As they do not, the preconditions and postconditions of these functions may carry different amounts of guard and receipt permissions compared to all subsequent rounds.
 This has to be kept in mind when working on verifying the protocol implementation in compliance with the requirements of the deletion mechanism.
 This work is explained in the next subsection.
@@ -317,12 +318,12 @@ Let's increment the session's version at the end of the receive function, before
 We look at the initiator $p$, supposing they are in session $s$ and version $n$, at the beginning of their receive function. We suppose having a private key $x_{n}$ with secrecy label $[(p,s,n),(p,s,n+1)]$, and a previous communication key $K_{2n-1}$ with secrecy label $[(p,s,n-1),(p,s,n),(p')]$.
 As we explained, we first compute the key $K_{2n}$ that has a secrecy label $[(p,s,n),(p,s,n+1),(p')]$.
 We can then delete $K_{2n-1}$ as it is not needed anymore.
-Next, we increment the session's version to $n+1$.
-Doing so, the methodology \emph{forces} us to delete $K_{2n-1}$ because it does not flow to version $n+1$.
-We then decrypt the received message using $K_{2n}$ and the receive function ends.
+Next, we decrypt the received message using $K_{2n}$
+Then we increment the session's version to $n+1$ and the receive function ends.
+Doing so, the methodology has \emph{forced} us to delete $K_{2n-1}$ because it does not flow to version $n+1$.
 Now, in the send function, we start by deriving the next communication key $K_{2n+1}$, which has a secrecy label $[(p,s,n),(p,s,n+1),(p')]$, like $K_{2n}$.
-Next, we delete $K_{2n}$ and $x_{n}$, as they are not needed anymore.
 We then compute the next private key $x_{n+1}$, choosing its secrecy label to be $[(p,s,n+1),(p,s,n+2)]$.
+Next, we delete $K_{2n}$ and $x_{n}$, as they are not needed anymore.
 We finish by sending our message encrypted with $K_{2n+1}$, and the send function ends.
 In this case, we were not forced yet to delete $K_{2n}$ and $x_{n}$, because we are still in version $n+1$.
 However, we will be forced to delete these two values at the end of the next receive, when we will increment the session's version to $n+2$.
@@ -363,7 +364,7 @@ func SendMessage(K []byte, privKey []byte, iter int, ghost v uint32,
 To give a final intuition about the actual reasoning that the developer has to do to comply with the deletion mechanism, we give in Figure~\ref{lst:send-message} the preconditions and postconditions related to the \texttt{guard} and \texttt{receipt} predicates of the initiator's send function.
 The case \texttt{iter == 0} corresponds to the send operation in the first communication round. Here, a fraction of \texttt{guard(v)}, where $v$ is the current version, is necessary to create the new Diffie-Hellman private key \texttt{newPrivKey}. As it is created with a label $[(p,s,v),(p,s,v+1)]$, we then convert it to the next version $v+1$. This consumes the fraction of \texttt{guard(v+1)} and returns both a fraction of \texttt{receipt(newPrivKey, v+1)} and a fraction of \texttt{guard(v)}.
 The case \texttt{iter == 1} corresponds to the second send operation of the initiator, so to the first send operation of the ratcheting protocol. Compared to previously, we additionally need another \texttt{guard(v)} fraction to compute the initial KDF, which in turn returns a \texttt{receipt(newK, v)} fraction. And we delete the previous private key, consuming the \texttt{receipt(privKey, v)} fraction and returning a \texttt{guard(v)} fraction.
-Finally, the case \texttt{iter > 1} is the same as before but with the additional deletion of the previous communication key, consuming the \texttt{receipt(K, v)} fraction and returning an additional \texttt{guard(v)} fraction.
+Finally, the case \texttt{iter > 1} is the same as before but with the additional deletion (using \texttt{DeleteSafely}) of the previous communication key, consuming the \texttt{receipt(K, v)} fraction and returning an additional \texttt{guard(v)} fraction.
 
 \subsection{Corruption}
 
@@ -375,9 +376,9 @@ For example, post-compromise security states that a key remains secret even if t
 
 In the Reusable Verification Library, corruption is modeled upon receiving and decrypting an AEAD encrypted message. 
 Recall from section~\ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender, unless the attacker performed the encryption.
-In the latter case, the attacker must have computed the encryption and accessed the encryption key and message, i.e. the secrecy labels of the encryption key and the message must flow to \emph{Public}.
+In the latter case, the attacker must have computed the encryption and accessed the encryption key and message, i.e.\ the secrecy labels of the encryption key and the message must flow to \emph{Public}.
 % To be precise, we either obtain this message invariant, or we do not and we thus learn that the message comes from the attacker.
-% In the latter case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
+% In the latter case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e.\ that their secrecy labels flow to \emph{Public}.
 
 Coming back to our ratcheting protocol, we have seen in the previous section that an ephemeral communication key has a secrecy label of the form $[(p,s,v),(p,s,v+1),(p')]$, where $v$ is the current version of session $s$.
 If we learn that the message came from the attacker and thus the secrecy label of the encryption key flows to \emph{Public}, we learn that either version $(p,s,v)$, or version $(p,s,v+1)$, or the long-term secrets of participant $p'$ must have been corrupted\footnote{Which is also the case when any session or any version of a session of $p'$ has been corrupted.}.
@@ -424,7 +425,7 @@ To satisfy the AEAD encryption preconditions, we additionally have to show that 
 In the non-corrupted case, we use the secrecy label $[(p,s,v),(p,s,v+1),(p')]$ of the encryption key, to which the message secrecy label $[(p,s),(p')]$ flows.
 In case of corruption, the secrecy label of the encryption key is harder to determine because we know nothing about the received associated data and we cannot assume that it is the other participant's public key.
 We have to make a disjunction on what the received associated data could be to compute the secrecy label of the encryption key in each case.
-By doing so, we can show that in all cases, the secrecy label of the encryption key flows to the label of the DH secret key used to compute it, which is $[(p,s,v),(p,s,v+1)]$. As the secrecy label of the message flows to this label, we satisfy the AEAD encryption precondition.
+By doing so, we can show that in all cases, the secrecy label of the encryption key flows to the label of the DH secret key used to compute it, which is $[(p,s,v),(p,s,v+1)]$. As the secrecy label of the message flows to this label, we satisfy the AEAD encryption preconditions.
 
 Overall, verifying our protocol implementation in case of corruption will require us to make several case distinctions and to call additional lemmas to complete each case's proof.
 While time-consuming, we are confident that it is completely doable.
@@ -462,8 +463,8 @@ However, note that the verification of the full ratcheting protocol is not compl
 In comparison, the original WireGuard implementation is composed of around 9.8 times more specification than code, but corruption has been fully integrated into its specification and its security properties have been verified.
 
 The verification time of our full ratcheting protocol is 669.5 seconds, which is around 1.5 times more than the verification time of the original WireGuard implementation.
-This can be explained in part because our full ratcheting protocol contains additional specifications related to our deletion mechanism, which is not present in the original WireGuard implementation.
-% the fact that the WireGuard specification makes better use of modularity, i.e. is composed of more functions, each with a smaller specification.
+This can be explained in part because our full ratcheting protocol contains additional specifications related to our deletion mechanism, which is not present in the specification of the original WireGuard.
+% the fact that the WireGuard specification makes better use of modularity, i.e.\ is composed of more functions, each with a smaller specification.
 % We are confident that one could improve the modularity of our specification and thus reduce its verification time.
 
 

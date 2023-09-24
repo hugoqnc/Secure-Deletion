@@ -46,7 +46,7 @@ func multiply(a, b int) (product int) {
     \label{lst:multiply-example}
 \end{figure}
 
-Preconditions and postconditions enable a modular verification of the program, i.e. we verify functions in isolation and only consider the specification of the functions that they call, not their bodies.
+Preconditions and postconditions enable a modular verification of the program, i.e.\ we verify functions in isolation and only consider the specification of the functions that they call, not their bodies.
 Doing so, we verify only once the correctness of a function.
 % Then, when this function is called by other functions, we simply assume that it satisfies its specification.
 This greatly improves performance, as it decomposes the verification of a program into the verification of each component.
@@ -71,7 +71,7 @@ To give a function permission to access some location, we specify the correspond
 A permission of $1$ to a heap location gives full permission, allowing the function to read and write to the location, and a permission of $0$ gives no permission.
 Gobra uses fractional permissions, which defines a permission as a rational number between $0$ and $1$.
 Any strictly positive permission smaller than one only gives read permission to the heap location.
-There can only be a total permission amount of $1$ for each heap location, which enforces that there can be either only one writer at a time while or multiple readers.
+There can only be a total permission amount of $1$ for each heap location, which enforces that there can be either only a single writer at a time or multiple readers.
 To illustrate how we can use permissions in Gobra, we show in Figure~\ref{lst:multiply-example-heap} the same example as in Figure~\ref{lst:multiply-example}, but this time \texttt{a} and \texttt{b} are pointers to heap locations.
 
 \begin{figure}
@@ -85,7 +85,7 @@ func multiply(a, b *int) (product int) {
     assert product == 0 ==> (*a == 0 || *b == 0)
 }
     \end{gobra}
-    \caption{This function returns the product of two positive integers. This is the same example as in Figure~\ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3). Removing line 1 would result in a verification error.}
+    \caption{This function returns the product of two positive integers. This is the same example as in Figure~\ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. \texttt{acc(a, 1/2)} specifies permission of $1/2$ to the heap location \texttt{a}. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3). Removing line 1 would result in a verification error.}
     \label{lst:multiply-example-heap}
 \end{figure}
 
@@ -113,7 +113,7 @@ We then present two existing approaches aiming at verifying protocol \emph{imple
 % - The trace invariant (but not the message invariant)
 
 In symbolic protocol analysis, we analyze a protocol at a higher level of abstraction to verify its behavior in all possible executions.
-We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
+We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e.\ the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
 Additionally, we assume that all operations are performed on symbolic \emph{terms} instead of bytes.%, which is why we abstract concrete bit-strings to terms.
 
 Furthermore, we consider a Dolev-Yao~\cite{dolev1983security} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in a participant's state).
@@ -141,7 +141,7 @@ We have mentioned that using a trace and maintaining a trace invariant allows us
 In particular, we want to prove forward secrecy and post-compromise security for certain protocols. In this subsection, we explain what these properties are and why they are important.
 
 Forward secrecy is a security property expressing how past communications are protected from a future compromise.
-A protocol is forward-secure if compromising the current state of a participant, like a communication key or a long-term secret key, does not reveal past communications, meaning that the attacker cannot decrypt previous messages.
+A protocol is forward-secure if compromising the current state of a participant does not reveal past communications, meaning that the attacker cannot decrypt previous messages.
 However, forward secrecy does not protect future communication. The attacker could use the compromised knowledge to impersonate a legitimate participant and read all future communications.
 This is why we are interested in the next property, post-compromise security.
 
@@ -167,7 +167,7 @@ In the following, we will introduce two existing approaches in this verification
 DY*~\cite{bhargavan2021text} is a framework for proving security properties about protocol implementations written in the F* programming language.
 Using a particular code structure and a particular way of storing program state, DY* is able to account for some implementation-level specificities.
 
-While DY* uses a trace to record protocol events, it is not \emph{ghost}, i.e. the trace is not only used for verification purposes.
+While DY* uses a trace to record protocol events, it is not \emph{ghost}, i.e.\ the trace is not only used for verification purposes.
 In particular, each participant's state is stored in a serialized way on the trace.
 % DY* uses a \emph{global trace} to model the global execution state of the protocol.
 When a protocol participant is taking a protocol step, it first reads its serialized state from the trace, deserializes it, performs the step, and then saves its new serialized state to the trace.
@@ -230,12 +230,12 @@ Unlike DY*, the global trace is a \emph{ghost} data structure for verification-o
 
 Furthermore, separation logic's resources are used to prove injective agreement, which is to the best of our knowledge not possible with DY*.
 To do so, they use that separation logic's resources are not duplicable, so if an assertion includes two resources, they are distinct.
-This can be used to express the uniqueness of an event and prove that an implementation detects if an attacker replays messages, which is necessary to satisfy injective agreement.
+This can be used to express the uniqueness of an event and prove that an implementation detects when an attacker replays messages, which is necessary to satisfy injective agreement.
 Because DY*'s invariant is expressed in first-order logic, it is unclear how they could reason about the uniqueness of particular events.
 
 Similarly to DY*, this methodology comes with a library, called the Reusable Verification Library, which allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
 Because they are using Gobra, verification is based on separation logic, which allows us to reason about heap manipulations.
-Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
+Currently, any creation of an array of bytes (i.e.\ creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
 The \texttt{Mem} predicate is used to abstract over the memory of a byte array and thus specifies permissions to every byte in the array.
 The predicate body is shown below, for illustration purposes only\footnote{The \texttt{Mem} predicate is in fact abstract in the library, meaning that clients of the reusable verification library cannot get direct access to the individual bytes of the array and instead have to perform all operations via corresponding library calls.}:
 \begin{gobra}
@@ -274,6 +274,6 @@ Each participant $p$ has a secret key $s_p$ and a public key $g^{s_p}$, where $g
     In the following, we will not mention the modulo prime number for brevity.
 }.
 In a Diffie-Hellman key exchange, participants Alice and Bob first exchange their public keys $g^{s_{Alice}}$ and $g^{s_{Bob}}$ over the insecure channel.
-Then, Alice computes a shared secret $(g^{s_{Bob}})^{s_{Alice}} = g^{s_{Alice} \cdot s_{Bob}}$ key by combining her secret key and Bob's public key, and Bob computes the same shared $(g^{s_{Alice}})^{s_{Bob}} = g^{s_{Alice} \cdot s_{Bob}}$ secret key by combining his secret key and Alice's public key.
+Then, Alice computes a shared secret key $(g^{s_{Bob}})^{s_{Alice}} = g^{s_{Alice} \cdot s_{Bob}}$ by combining her secret key and Bob's public key, and Bob computes the same shared secret key $(g^{s_{Alice}})^{s_{Bob}} = g^{s_{Alice} \cdot s_{Bob}}$ by combining his secret key and Alice's public key.
 
 This key exchange will be extensively used in the protocols that we aim to verify and that we will present later.

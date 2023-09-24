@@ -8,7 +8,7 @@ By building upon standard separation logic predicates, the extended methodology 
 
 The generic extension we introduced is flexible enough to verify various protocol implementations that use ephemeral data, such as Signal~\cite{marlinspike2016x3dh} and its key rotation scheme. Our methodology can be used to prove strong security properties like forward secrecy and post-compromise security.
 
-Furthermore, we have enlarged the Reusable Verification Library~\cite{ArquintSchwerhoffMehtaMueller23} for Go to contain our methodology extension.
+Furthermore, we have extended the Reusable Verification Library~\cite{ArquintSchwerhoffMehtaMueller23} for Go to contain our methodology.
 Using a solution inspired by counting permissions~\cite{roshardt2021extending}, we provide the library with the ability to track sensitive values in a protocol implementation and ensure that they are deleted in a timely manner.
 By implementing this solution in several functions of the library, we facilitate the work of the developer by ensuring in a sound way that the values they create can only exist during the periods of time specified for these values.
 
