@@ -2,16 +2,16 @@
 \label{chap:background}
 
 In this chapter, we introduce the reader to the concepts that are necessary to understand the rest of this thesis.
-We start by introducing how code verification works with a particular focus on the Gobra verifier.
+We start by introducing how code verification works with a particular focus on the Gobra~\cite{wolf2021gobra} verifier.
 Then, we present existing work on the verification of protocol implementations, which will form the foundation of our work.
 Finally, we explain two important cryptographic concepts that will be used in the protocols that we aim to verify.
 
 \section{The Gobra verifier}
 \label{sec:the-gobra-verifier}
 
-Gobra is a verifier for programs written in the Go programming language.
+Gobra~\cite{wolf2021gobra} is a verifier for programs written in the Go programming language.
 In practice, a user writes a specification of the program, and Gobra verifies that every execution of the program satisfies this specification.
-Gobra is based on the Viper verification infrastructure. This means that the Gobra specification and Go implementation are translated to the Viper intermediate language, which is then verified using one of the Viper backends.
+Gobra is based on the Viper~\cite{muller2016viper} verification infrastructure. This means that the Gobra specification and Go implementation are translated to the Viper intermediate language, which is then verified using one of the Viper backends.
 
 In this section, we first provide the reader with a brief introduction to the modular verification of Go programs using Gobra.
 We then introduce fractional permissions, which are used to reason about heap memory accesses and in particular allow concurrent read operations.
@@ -116,12 +116,12 @@ In symbolic protocol analysis, we analyze a protocol at a higher level of abstra
 We use the symbolic model of cryptography, where we assume that the cryptographic primitives are secure, i.e. the plaintext can only be obtained from a ciphertext if decryption is performed with the correct decryption key.
 Additionally, we assume that all operations are performed on symbolic \emph{terms} instead of bytes.%, which is why we abstract concrete bit-strings to terms.
 
-Furthermore, we consider a Dolev-Yao\cite{} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in a participant's state).
+Furthermore, we consider a Dolev-Yao~\cite{dolev1983security} attacker present in the network. This attacker can perform arbitrary operations on this term level, has full control over the network (including reading and sending any message), and can corrupt any participant (which means that the attacker learns all the terms contained in a participant's state).
 
 A common way for reasoning about protocols in this setting is to consider all possible \emph{traces} of a protocol.
 A trace records the sequence of protocol events in a particular run of the protocol.
 Security properties can be expressed as a logical expression about a trace, and then verified by checking whether it holds for all possible traces of the protocol.
-Automated provers like Tamarin\cite{} and ProVerif\cite{} can verify trace-based security properties by analyzing all possible traces.
+Automated provers like Tamarin~\cite{meier2013tamarin} and ProVerif~\cite{blanchet2016modeling} can verify trace-based security properties by analyzing all possible traces.
 
 In this work, we aim to verify security properties for protocol \emph{implementations}.
 While verifying protocol \emph{models} is useful to prove the security of the protocol design, it does not guarantee that an implementation of this protocol is free of security vulnerabilities induced by common programming errors or the incorrect implementation of the protocol design.
@@ -148,7 +148,7 @@ This is why we are interested in the next property, post-compromise security.
 Post-compromise security is a security property expressing how future communications are protected from a past compromise.
 First, notice that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant.
 After such a compromise, other participants have no guarantee whether they are communicating with the compromised participant or the attacker because the attacker has access to the same secrets as the compromised participant and can thus impersonate this participant.
-We instead consider the formalized notion of post-compromise \emph{via state} \cite{}:
+We instead consider the formalized notion of post-compromise \emph{via state}~\cite{7536374}:
 a participant can communicate securely with a peer even when a past state of the participant is revealed to the attacker, as long as the participant's current state is not revealed to the attacker and some secret data remains available exclusively to the participants.
 If the participant's current state is revealed to the attacker, post-compromise security via state trivially holds but we get no guarantee of the security of future communications.
 % during a session even when long-term keys have been leaked as long as there is some secret data available exclusively to the participants.
@@ -164,7 +164,7 @@ In the following, we will introduce two existing approaches in this verification
 % - CanFlow should be introduced in the background
 % - Snapshots
 
-DY*\cite{} is a framework for proving security properties about protocol implementations written in the F* programming language.
+DY*~\cite{bhargavan2021text} is a framework for proving security properties about protocol implementations written in the F* programming language.
 Using a particular code structure and a particular way of storing program state, DY* is able to account for some implementation-level specificities.
 
 While DY* uses a trace to record protocol events, it is not \emph{ghost}, i.e. the trace is not only used for verification purposes.
@@ -213,9 +213,9 @@ Additionally, the DY* framework is composed of a library, containing protocol-in
 The DY* framework can only verify protocol implementations written in the functional F* language that adhere to certain assumptions about their structure and program state storage.
 % However, there are many existing protocol implementations written in various languages that cannot be verified with this approach.
 However, these assumptions do not hold in general for existing implementations.
-Arquint et al.\cite{} present a methodology for verifying existing heap-manipulating protocol implementations. This methodology is agnostic to the programming language and relies only on standard features present in most separation logic-based verifiers. In the following, we will focus on Go implementations and the Gobra\cite{} verifier.
+Arquint et al.~\cite{ArquintSchwerhoffMehtaMueller23} present a methodology for verifying existing heap-manipulating protocol implementations. This methodology is agnostic to the programming language and relies only on standard features present in most separation logic-based verifiers. In the following, we will focus on Go implementations and the Gobra~\cite{wolf2021gobra} verifier.
 
-This methodology is inspired by DY* and also uses a global trace to provide a global view of the entire system.
+This methodology is inspired by DY*~\cite{bhargavan2021text} and also uses a global trace to provide a global view of the entire system.
 % Arbitrary code structure
 To address the issue of arbitrary code structure in existing implementations, the trace is treated as a concurrent data structure.
 This treatment ensures that all possible interleaving of events are considered, without relying on any code structure assumptions.
@@ -250,13 +250,13 @@ However, this methodology does not support versions in secrecy labels.
 Without this fine-grained temporality, it is not possible to prove forward secrecy and post-compromise security for protocols like Signal.
 
 \section{Cryptography}
-In this section, we explain two important cryptographic concepts: AEAD encryption and Diffie-Hellman key exchange.
+In this section, we explain two important cryptographic concepts: AEAD encryption~\cite{10.1145/586110.586125} and Diffie-Hellman key exchange~\cite{diffie2022new}.
 These notions will play a major role in the rest of this thesis. 
 However, the discerning reader can skip this section if he or she is already familiar with these basics.
 
 \subsection{AEAD encryption}
 % - What associated data is 
-In the protocols that we aim to verify and that we will present later, authenticated encryption with associated data (AEAD) plays an important role in the communication between participants.
+In the protocols that we aim to verify and that we will present later, authenticated encryption with associated data (AEAD)~\cite{10.1145/586110.586125} plays an important role in the communication between participants.
 AEAD is a symmetric encryption scheme.
 It provides confidentiality, meaning the encrypted message cannot be read by an attacker who does not know the key.
 It also provides authenticity, meaning that an active attacker cannot modify the encrypted message or associated data without being detected and that the receiver can verify that the message was sent by the expected sender.
@@ -269,7 +269,7 @@ Then on the receiver side, AEAD decryption takes as input the same key, the ciph
 \subsection{Diffie-Hellman key exchange}
 % - What a DH key exchange is
 
-A Diffie-Hellman key exchange is a public-key protocol that allows two participants to agree on a shared secret key over an insecure channel.
+A Diffie-Hellman key exchange~\cite{diffie2022new} is a public-key protocol that allows two participants to agree on a shared secret key over an insecure channel.
 Each participant $p$ has a secret key $s_p$ and a public key $g^{s_p}$, where $g$ is a primitive root modulo a prime number\footnote{
     In the following, we will not mention the modulo prime number for brevity.
 }.

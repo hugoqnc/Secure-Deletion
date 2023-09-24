@@ -10,14 +10,14 @@
 \chapter{Design}
 \label{chap:design}
 
-In this chapter, we explain how we extended the work of Arquint et al.\ \cite{}, presented in section \ref{sec:modular-verification-of-existing-implementations}, to express time-sensitive values and to enforce their deletion at the right time.
+In this chapter, we explain how we extended the work of Arquint et al.~\cite{ArquintSchwerhoffMehtaMueller23}, presented in section \ref{sec:modular-verification-of-existing-implementations}, to express time-sensitive values and to enforce their deletion at the right time.
 Practically, we extended their Reusable Verification Library in order to provide someone verifying a protocol implementation with the possibility of proving security properties like forward secrecy and post-compromise security.
 In the following sections, we will refer to this person as \emph{the developer}, who uses this library to verify a protocol implementation.
 
 We start by giving an overview of our goal and a high-level idea of our methodology to achieve it.
 Then, we introduce counting permissions, as the core tool on which our deletion mechanism is based.
 We continue by explaining how we extended the library to implement our deletion mechanism.
-Finally, we give a brief look into an alternative approach that would have been simpler, but that is not currently supported by Gobra.
+Finally, we give a brief look into an alternative approach that would have been simpler, but that is not currently supported by Gobra~\cite{wolf2021gobra}.
 
 \section{Overview}
 \label{sec:overview}
@@ -26,7 +26,7 @@ This section gives an overview to better understand our goal and the high-level 
 With the aim of verifying properties like forward secrecy and post-compromise security for a protocol implementation, we need to model the fact that some ephemeral values should only exist for a limited amount of time.
 Additionally, we need to enforce that these values are deleted before the end of their time frame.
 
-We start by explaining the goal of our methodology by introducing a relevant protocol, the Diffie-Hellman Ratchet, and the security properties we want to prove about it.
+We start by explaining the goal of our methodology by introducing a relevant protocol, the Diffie-Hellman Ratchet~\cite{perrin2016double}, and the security properties we want to prove about it.
 Then, we explain how we introduce a notion of temporality in the methodology, by adding  \emph{versions}, which define fine-grained time frames during which certain values are present in memory.
 Finally, because versions specify that a value should only be able to exist in some time frame, we reason about how to enforce that it is deleted before this time frame ends.
 
@@ -40,7 +40,7 @@ We consider a slightly simpler protocol, on which Signal is based, involving a s
 \subsubsection{Diffie-Hellman Ratchet}
 \label{sec:diffie-hellman-ratchet}
 
-The Diffie-Hellman (DH) Ratchet is a continuous key agreement protocol, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with a new key.
+The Diffie-Hellman (DH) Ratchet~\cite{perrin2016double} is a continuous key agreement protocol, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with a new key.
 It is presented in Figure \ref{fig:dh-ratchet}.
 
 \begin{figure}
@@ -82,7 +82,7 @@ Therefore, the DH Ratchet protocol satisfies forward secrecy. This property is e
 \label{sec:post-compromise-security}
 
 Additionally, the DH Ratchet protocol is designed to be \emph{self-healing}, meaning that it should allow communication to resume securely at some point after a compromise. This is the property of post-compromise security.
-Recall that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant, but we instead consider that some secret data remains available exclusively to the participants after the compromise (post-compromise \emph{via state} \cite{}).
+Recall that post-compromise security is not achievable after the \emph{unrestricted} compromise of a participant, but we instead consider that some secret data remains available exclusively to the participants after the compromise (post-compromise \emph{via state}~\cite{7536374}).
 In the DH Ratchet protocol, we consider that the attacker compromised Alice's $K_n$ communication key \emph{after} she derived the new $K_{n+1}$ key, and after she and her peer Bob have deleted their DH private key they used to compute $K_{n+1}$.
 At this point, the attacker cannot obtain $K_{n+1}$ because they cannot have access to the associated DH shared secret.
 
@@ -95,7 +95,7 @@ Our methodology to prove these two strong security properties, forward secrecy a
 \label{sec:versions}
 
 To introduce a notion of temporality, we divide the time axis into successive time frames. We number these time frames with integers, starting at $0$, and call them \emph{versions}.
-Similarly to what is done in DY* \cite{}, each participant's session is given a version field, which keeps track of the current version of the protocol.
+Similarly to what is done in DY*~\cite{bhargavan2021text}, each participant's session is given a version field, which keeps track of the current version of the protocol.
 At this point, we can uniquely identify a time frame in a protocol session by the triplet $(p, s, v)$, where $p$ is the participant executing the protocol session $s$, and $v$ is the version defining the time frame. We call this triplet a version identifier.
 
 We then use these identifiers to specify the time frames during which certain terms are present in memory.
@@ -128,7 +128,7 @@ We discuss next the solution used in DY*. However, this solution is not applicab
 \subsubsection{Existing approach in DY*}
 \label{sec:existing-approach-in-dy}
 
-In DY*, a participant uses a storage API to store all of its knowledge on the trace.
+In DY*~\cite{bhargavan2021text}, a participant uses a storage API to store all of its knowledge on the trace.
 In particular, recall from section \ref{sec:dy-star} that a participant stores the knowledge of ongoing sessions into an array, composed of each serialized session state, and each session is given a version number.
 Upon updating some session state, the participant can also update and increment the version number of the session.
 An invariant over the state makes sure that only data from the session's version can be stored, ensuring that old keys cannot remain in memory.
@@ -144,7 +144,7 @@ In the next part, we present our generic approach to enforce the deletion of old
 \label{sec:our-approach}
 
 As we cannot simply iterate over the full session state to remove outdated keys like in DY*, we present a new approach to ensure that versioned values get safely deleted before their version expires.
-Note that our approach only \emph{extends} the existing approach of Arquint's et al., which means that our modified library can still be used to verify unversioned protocols in the same way as before.
+Note that our approach only \emph{extends} the existing approach of Arquint's et al.~\cite{ArquintSchwerhoffMehtaMueller23}, which means that our modified library can still be used to verify unversioned protocols in the same way as before.
 
 The intuition of the methodology is to let the developer (that is verifying a protocol implementation) choose when to delete a versioned value.
 For this purpose, we provide a \emph{secure} deletion function for which we assume that it erased the value, e.g. by zeroing out the memory and ensuring that this write operation is not optimized away by the compiler.
@@ -158,14 +158,14 @@ When we increment the version of the session, we check that $c_i = 0$, meaning t
 However, this approach cannot be trivially implemented in our case because we cannot just use a counter \emph{variable} that the developer could access at will: they would just have to manually set it to $0$ before incrementing the version of the session, and the counter check would be meaningless.
 We would have to ensure that the developer cannot directly manipulate the counter, which may be difficult to achieve.
 Additionally, we want to support concurrency which would require us at least to use an atomic counter or to protect the counter by a lock.
-Instead, to solve these challenges without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}. Those will be explained in the next section, before using them to design our deletion mechanism.
+Instead, to solve these challenges without the limitations of a counter variable, we will create a mechanism based on \emph{counting permissions}~\cite{roshardt2021extending}. Those will be explained in the next section, before using them to design our deletion mechanism.
 
 Note that with this approach, one could think that the developer could just never increment the version of the session, and thus would never have to delete any versioned value. While this is true, if the developer wants to verify meaningful properties like forward secrecy, they will have to increment the version at some point to express the property in terms of the version.
 
 \section{Counting permissions}
 \label{sec:counting-permissions}
 
-Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions \cite{}.
+Because keeping track of created and deleted values using a counter variable could be easily bypassed by the developer, we base our work on counting permissions~\cite{roshardt2021extending}.
 % In this section, we build our method on the same intuition as the approach explained above, but using counting permissions should prevent the developer from circumventing the deletion mechanism.
 While counting permissions follow a similar idea as a counter, they overcome the limitations mentioned earlier and are suitable for our use case, i.e. they support arbitrary representations of the application state and can be adapted to support concurrency.
 
@@ -196,7 +196,7 @@ Thus, in the next section, we present an alternative to counting permissions tha
 \subsection{Implementation in Gobra}
 \label{sec:implementation-in-gobra}
 
-Gobra currently does not support counting permissions but only fractional permissions, which were explained in section \ref{sec:permissions}.
+Gobra~\cite{wolf2021gobra} currently does not support counting permissions but only fractional permissions, which were explained in section \ref{sec:permissions}.
 Recall that in this model, permission shares are valued in $[0,1]\cap\mathbb{Q}$, a share of value $0/1$ means no permission, a share of value $1/1$ means full permission, and any other value means partial permission.
 
 Because fully encoding counting permissions using fractional permissions is not trivial, we instead restrict ourselves to a solution based on fractional permissions that tracks the number of versioned values with the help of our annotated library functions.
@@ -309,14 +309,13 @@ Our approach is, contrary to counting permissions, supported by Gobra.
 As we wanted, our approach also supports arbitrary representations of the application state, concurrency and unboundedly many versioned values.
 % To conclude, we have identified a satisfactory approach for achieving functionality reminiscent of counting permissions in Gobra.
 Despite giving more flexibility to the developer, this method is sound and constitutes the core of our deletion mechanism.
-\todo{I don't explain why our approach supports concurrency}
 
 \section{Extension of the library}
 \label{sec:extension-of-the-library}
 
 We introduced a general mechanism to enforce the deletion of versioned values before the end of their time frame, defined in terms of versions allowed by their secrecy label.
 This mechanism is central to the methodology.
-In this section, we explain how we integrate it in Arquint's et al.\ Reusable Verification Library \cite{}, to provide the developer with functions handling versioned values.
+In this section, we explain how we integrate it in Arquint's et al.\ Reusable Verification Library~\cite{ArquintSchwerhoffMehtaMueller23}, to provide the developer with functions handling versioned values.
 
 We start by explaining how we store and access the current version of a session.
 Then, we explain how we adapted the functions that create a value, e.g. a nonce, to support versioned values according to our methodology.
@@ -454,12 +453,12 @@ Additionally, \texttt{DeleteSafely} consumes the memory predicate of the deleted
 To securely erase a value from memory, we use the implementation shown in lines 7-12 of Figure \ref{lst:delete-safely}.
 This ensures that the memory is zeroed out and that this operation is not optimized away by the compiler.
 Line 12 currently seems sufficient to prevent the Go compiler from eliminating the function's body.
-Various alternatives have been surveyed by Yang et al. \cite{} for the C language.
+Various alternatives have been surveyed by Yang et al.~\cite{yang2017dead} for the C language.
 
 \subsection{Creating values with multiple versions for ratcheting}
 \label{sec:creating-values-with-multiple-versions-for-ratcheting}
 
-When presenting the Diffie-Hellman Ratchet in section \ref{sec:diffie-hellman-ratchet}, we explained the purpose of the ratcheting step, which is to derive a new communication key from the previous one. Once a new communication key has been derived, the previous one is no longer needed and should be deleted.
+When presenting the Diffie-Hellman Ratchet~\cite{perrin2016double} in section \ref{sec:diffie-hellman-ratchet}, we explained the purpose of the ratcheting step, which is to derive a new communication key from the previous one. Once a new communication key has been derived, the previous one is no longer needed and should be deleted.
 Intuitively, the new key should exist in a more recent time frame than the previous one, and both keys should coexist for a short period of time, from the ratcheting step to the deletion of the previous key.
 
 In terms of versions, this means that if the previous key $K_n$ is versioned with the current version $v$, it is not sufficient to create the new key $K_{n+1}$ only with version $v+1$ because it could not coexist with $K_n$.
@@ -629,6 +628,7 @@ This means that it could be converted to the next version infinitely with the \t
 Although it works, converting this value for each version would be a verification burden in practice.
 This is why we offer an additional library function, provided in Figure \ref{lst:guard-from-unversioned-receipt}, which checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5).
 This conceptually removes the corresponding values from our deletion tracking mechanism.
+\todo{Weird to have a single word on the next page.}
 
 \begin{figure}
     \begin{gobra}
@@ -700,7 +700,7 @@ In the next section, we will give a glimpse into an alternative approach to impl
 \section{Alternative design using obligations}
 \label{sec:alternative-design-using-obligations}
 
-An obligation, defined for a thread, specifies an action to be eventually performed by this thread~\cite{}. An obligation is initially \emph{emitted}, and once the action is performed, the obligation is \emph{discharged}.
+An obligation, defined for a thread, specifies an action to be eventually performed by this thread~\cite{bostrom2014modular}. An obligation is initially \emph{emitted}, and once the action is performed, the obligation is \emph{discharged}.
 
 In this section, we first present how we could use obligations to implement the deletion mechanism in a simpler way.
 Then, as Gobra does not support obligations, we present a way to add them to the language to be able to implement the deletion mechanism.

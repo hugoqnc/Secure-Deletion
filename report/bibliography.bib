@@ -1,6 +1,163 @@
-@book{bringhurst1996ets,
-  title={{The Elements of Typographic Style}},
-  author={Bringhurst, Robert},
-  year={1996},
-  publisher={Hartley \& Marks}
+@InProceedings{ArquintSchwerhoffMehtaMueller23,
+  author = {Arquint, Linard and Schwerhoff, Malte and Mehta, Vaibhav and M\"uller, Peter},
+  title = {A Generic Methodology for the Modular Verification of Security Protocol Implementations},
+  year = {2023},
+  isbn = {9798400700507},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  booktitle = {Proceedings of the 2023 ACM SIGSAC Conference on Computer and Communications Security},
+  numpages = {15},
+  keywords = {protocol-implementation-verification;symbolic-security;separation-logic;automated-verification;injective-agreement;forward-secrecy},
+  location = {Copenhagen, Denmark},
+  series = {CCS '23},
+  doi = {10.1145/3576915.3623105}
+}
+
+@inproceedings{bhargavan2021text,
+  title={{DY*}: A Modular Symbolic Verification Framework for Executable Cryptographic Protocol Code},
+  author={Bhargavan, Karthikeyan and Bichhawat, Abhishek and Do, Quoc Huy and Hosseyni, Pedram and K{\"u}sters, Ralf and Schmitz, Guido and W{\"u}rtele, Tim},
+  booktitle={2021 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+  pages={523--542},
+  year={2021},
+  organization={IEEE}
+}
+
+@inproceedings{wolf2021gobra,
+  title={Gobra: Modular specification and verification of go programs},
+  author={Wolf, Felix A and Arquint, Linard and Clochard, Martin and Oortwijn, Wytse and Pereira, Jo{\~a}o C and M{\"u}ller, Peter},
+  booktitle={Computer Aided Verification: 33rd International Conference, CAV 2021, Virtual Event, July 20--23, 2021, Proceedings, Part I 33},
+  pages={367--379},
+  year={2021},
+  organization={Springer}
+}
+
+@inproceedings{muller2016viper,
+  title={Viper: A verification infrastructure for permission-based reasoning},
+  author={M{\"u}ller, Peter and Schwerhoff, Malte and Summers, Alexander J},
+  booktitle={Verification, Model Checking, and Abstract Interpretation: 17th International Conference, VMCAI 2016, St. Petersburg, FL, USA, January 17-19, 2016. Proceedings 17},
+  pages={41--62},
+  year={2016},
+  organization={Springer}
+}
+
+@article{dolev1983security,
+  title={On the security of public key protocols},
+  author={Dolev, Danny and Yao, Andrew},
+  journal={IEEE Transactions on information theory},
+  volume={29},
+  number={2},
+  pages={198--208},
+  year={1983},
+  publisher={IEEE}
+}
+
+@article{perrin2016double,
+  title={The double ratchet algorithm},
+  author={Perrin, Trevor and Marlinspike, Moxie},
+  journal={GitHub wiki},
+  pages={10},
+  year={2016}
+}
+
+@article{marlinspike2016x3dh,
+  title={The x3dh key agreement protocol},
+  author={Marlinspike, Moxie and Perrin, Trevor},
+  journal={Open Whisper Systems},
+  volume={283},
+  pages={10},
+  year={2016}
+}
+
+@inproceedings{meier2013tamarin,
+  title={The TAMARIN prover for the symbolic analysis of security protocols},
+  author={Meier, Simon and Schmidt, Benedikt and Cremers, Cas and Basin, David},
+  booktitle={Computer Aided Verification: 25th International Conference, CAV 2013, Saint Petersburg, Russia, July 13-19, 2013. Proceedings 25},
+  pages={696--701},
+  year={2013},
+  organization={Springer}
+}
+
+@article{blanchet2016modeling,
+  title={Modeling and verifying security protocols with the applied pi calculus and ProVerif},
+  author={Blanchet, Bruno and others},
+  journal={Foundations and Trends{\textregistered} in Privacy and Security},
+  volume={1},
+  number={1-2},
+  pages={1--135},
+  year={2016},
+  publisher={Now Publishers, Inc.}
+}
+
+@INPROCEEDINGS{7536374,
+  author={Cohn-Gordon, Katriel and Cremers, Cas and Garratt, Luke},
+  booktitle={2016 IEEE 29th Computer Security Foundations Symposium (CSF)}, 
+  title={On Post-compromise Security}, 
+  year={2016},
+  volume={},
+  number={},
+  pages={164-178},
+  doi={10.1109/CSF.2016.19}
+}
+
+@inproceedings{10.1145/586110.586125,
+author = {Rogaway, Phillip},
+title = {Authenticated-Encryption with Associated-Data},
+year = {2002},
+isbn = {1581136129},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/586110.586125},
+doi = {10.1145/586110.586125},
+abstract = {When a message is transformed into a ciphertext in a way designed to protect both its privacy and authenticity, there may be additional information, such as a packet header, that travels alongside the ciphertext (at least conceptually) and must get authenticated with it. We formalize and investigate this authenticated-encryption with associated-data (AEAD) problem. Though the problem has long been addressed in cryptographic practice, it was never provided a definition or even a name. We do this, and go on to look at efficient solutions for AEAD, both in general and for the authenticated-encryption scheme OCB. For the general setting we study two simple ways to turn an authenticated-encryption scheme that does not support associated-data into one that does: nonce stealing and ciphertext translation. For the case of OCB we construct an AEAD-scheme by combining OCB and the pseudorandom function PMAC, using the same key for both algorithms. We prove that, despite "interaction" between the two schemes when using a common key, the combination is sound. We also consider achieving AEAD by the generic composition of a nonce-based, privacy-only encryption scheme and a pseudorandom function.},
+booktitle = {Proceedings of the 9th ACM Conference on Computer and Communications Security},
+pages = {98–107},
+numpages = {10},
+keywords = {associated-data problem, modes of operation, OCB, block-cipher usage, key separation, authenticated-encryption},
+location = {Washington, DC, USA},
+series = {CCS '02}
+}
+
+@incollection{diffie2022new,
+  title={New directions in cryptography},
+  author={Diffie, Whitfield and Hellman, Martin E},
+  booktitle={Democratizing Cryptography: The Work of Whitfield Diffie and Martin Hellman},
+  pages={365--390},
+  year={2022}
+}
+
+@phdthesis{roshardt2021extending,
+  title={Extending the Viper Verification Language with User-Defined Permission Models},
+  author={Roshardt, Matthias},
+  year={2021},
+  school={Master’s thesis}
+}
+
+@inproceedings{yang2017dead,
+  title={Dead store elimination (still) considered harmful},
+  author={Yang, Zhaomo and Johannesmeyer, Brian and Olesen, Anders Trier and Lerner, Sorin and Levchenko, Kirill},
+  booktitle={26th USENIX Security Symposium (USENIX Security 17)},
+  pages={1025--1040},
+  year={2017}
+}
+
+@techreport{bostrom2014modular,
+  title={Modular verification of finite blocking in non-terminating programs},
+  author={Bostr{\"o}m, Pontus and M{\"u}ller, Peter},
+  year={2014},
+  institution={ETH Zurich}
+}
+
+@inproceedings{donenfeld2017wireguard,
+  title={Wireguard: next generation kernel network tunnel.},
+  author={Donenfeld, Jason A},
+  booktitle={NDSS},
+  pages={1--12},
+  year={2017}
+}
+
+@article{perrin2018noise,
+  title={The noise protocol framework},
+  author={Perrin, Trevor},
+  journal={PowerPoint Presentation},
+  year={2018}
 }

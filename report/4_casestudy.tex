@@ -4,11 +4,11 @@
 \chapter{Case study}
 \label{chap:case-study}
 
-Now that we have presented our methodology and its implementation in the Reusable Verification Library, we apply it to a protocol to showcase its use. 
+Now that we have presented our methodology and its implementation in the Reusable Verification Library~\cite{ArquintSchwerhoffMehtaMueller23}, we apply it to a protocol to showcase its use. 
 % In this chapter, our goal is to show that the library is now able to verify a protocol whose security properties rely on the frequent deletion of sensitive data.
 We demonstrate that our implemented deletion mechanism is expressive enough to support a protocol performing key ratcheting.
 
-We start by explaining how we adapted the WireGuard protocol to perform Signal-like key ratcheting.
+We start by explaining how we adapted the WireGuard~\cite{donenfeld2017wireguard} protocol to perform Signal-like key ratcheting.
 Then, we present how we implemented and verified this protocol using our methodology, and the various challenges we faced during this process.
 Finally, we detail the remaining work to achieve the verification of our protocol's security properties.
 
@@ -16,14 +16,14 @@ Finally, we detail the remaining work to achieve the verification of our protoco
 \label{sec:choosing-a-protocol-to-verify}
 
 First, we decide on a protocol to verify.
-We build on the WireGuard protocol to make the verification efforts manageable, as it has already been implemented and verified with the Reusable Verification Library.
-Additionally, we use the Signal protocol as inspiration, as it uses key ratcheting to achieve forward secrecy and post-compromise security, while WireGuard does not.
+We build on the WireGuard~\cite{donenfeld2017wireguard} protocol to make the verification efforts manageable, as it has already been implemented and verified with the Reusable Verification Library.
+Additionally, we use the Signal~\cite{marlinspike2016x3dh} protocol as inspiration, as it uses key ratcheting to achieve forward secrecy and post-compromise security, while WireGuard does not.
 % We take several criteria into account, which we list here in order of importance.
 % First, the protocol must use ephemeral keys that exist only for a short time before being deleted, to satisfy some strong security property.
 % Second, we want the protocol to be simple enough to be implemented and verified in a reasonable amount of time. As we only aim to showcase the use of our extended verification library, there is no need to use a state-of-the-art security protocol.
 % And third, we want to derive our protocol from an existing one, to show that our library can verify real-world protocols, and not only toy examples.
 
-In this section, we start by presenting the Diffie-Hellman ratchet, a protocol that is a core component of Signal's ratcheting process.
+In this section, we start by presenting the Diffie-Hellman ratchet~\cite{perrin2016double}, a protocol that is a core component of Signal's ratcheting process.
 We continue by explaining how we use WireGuard's handshake to obtain the prior knowledge required by the Diffie-Hellman ratchet.
 Finally, we present our final choice of protocol, a modified version of the Diffie-Hellman ratchet, and explain why we made this choice.
 
@@ -32,11 +32,11 @@ Finally, we present our final choice of protocol, a modified version of the Diff
 % DH Ratchet, Signal
 
 We have already mentioned the Signal protocol in the previous chapters, which is based on the Double Ratchet algorithm.
-Signal is a state-of-the-art protocol, whose verification of a Go implementation\footnote{Note that there is no official Go implementation of Signal, but some unmaintained inofficial implementations exist.} has, to the best of our knowledge, never been attempted.
+Signal~\cite{marlinspike2016x3dh} is a state-of-the-art protocol, whose verification of a Go implementation\footnote{Note that there is no official Go implementation of Signal, but some unmaintained inofficial implementations exist.} has, to the best of our knowledge, never been attempted.
 However, we do not consider that we have sufficient time to verify such a complex protocol implementation in the scope of this thesis.
 Optimally, we would like to verify a protocol implementation that uses the same principles of ephemeral keys and ratcheting to achieve comparable security properties.
 
-Such a protocol exists and has already been introduced in section \ref{sec:diffie-hellman-ratchet}: the Diffie-Hellman (DH) Ratchet.
+Such a protocol exists and has already been introduced in section \ref{sec:diffie-hellman-ratchet}: the Diffie-Hellman (DH) Ratchet~\cite{perrin2016double}.
 Recall that the DH Ratchet is the core component of the Signal protocol. Participants frequently exchange their Diffie-Hellman public keys and use them to obtain a shared secret that is used to derive new ephemeral keys to encrypt their messages.
 The DH Ratchet aims to provide both forward secrecy and post-compromise security, which are the same security properties that Signal aims to achieve.
 If the DH Ratchet can provide the same guarantees as the more complex Signal protocol, it is because the DH Ratchet uses a simpler communication model, where participants alternate sending and receiving messages.
@@ -52,14 +52,14 @@ We cannot use the DH Ratchet without this prior knowledge, which requires us to 
 % X3DH, WireGuard noise's Handshake
 
 Similarly to the Diffie-Hellman Ratchet, the Signal protocol starts with an initial key agreement before running the Double Ratchet algorithm.
-Signal uses the X3DH key agreement protocol, which is a state-of-the-art protocol that provides forward secrecy and cryptographic deniability.
+Signal uses the X3DH~\cite{marlinspike2016x3dh} key agreement protocol, which is a state-of-the-art protocol that provides forward secrecy and cryptographic deniability.
 Additionally, X3DH is specifically designed to work asynchronously when one user is offline.
 % Because X3DH is a complex protocol that would require significant time to implement and verify, and because we do not necessarily need all of its strong security properties, we are going to use a simpler protocol.
 To focus on the ratcheting part of the protocol, we instead pick WireGuard's handshake protocol to perform the initial key agreement, which has already been implemented and verified with the Reusable Verification Library.
 In practice, to build our protocol, we start from the existing WireGuard implementation and change its message transport phase, which currently keeps using the same session key for all messages, to use key ratcheting such that fresh keys are used for each transport message.
 
 % We use the fact that the WireGuard protocol has already been implemented and verified with the Reusable Verification Library.
-WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise IKpsk2} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
+WireGuard starts with a handshake based on a Diffie-Hellman key exchange, called the \emph{Noise IKpsk2}~\cite{perrin2018noise} handshake from the Noise protocol. This handshake establishes symmetric keys between the initiator and responder, which is the first part of the prior knowledge required by the DH Ratchet.
 
 Then, it is easy to add a communication step between the initiator and responder, in which the responder computes a Diffie-Hellman key pair and sends its public key to the initiator, authenticated with the symmetric key established by the handshake.
 Therefore, by combining the IKpsk2 handshake with this additional communication step, we obtain the prior knowledge required by the DH Ratchet.
@@ -243,7 +243,7 @@ This leaves us with two kinds of messages to consider.
 % \todo{The truth is that in the end, I used the same message invariant for both types of messages. The following paragraphs however still seem necessary as they explain how I implemented new usages to use the right message invariants.}
 
 Because of these different kinds of messages and their associated message invariants, we need to be able to distinguish them in the library.
-To do so, the current implementation of the library, similarly to DY*, uses \emph{usage constraints}.
+To do so, the current implementation of the library, similarly to DY*~\cite{bhargavan2021text}, uses \emph{usage constraints}.
 A usage is a way to annotate a term that should be used for a specific purpose.
 For example in the case of our ratcheting protocol, we use usages to distinguish Diffie-Hellman private keys, public keys, shared secrets, and $K$ versioned communication keys.
 A usage can initially be defined upon creation of a value. This is the case when creating a Diffie-Hellman private key.

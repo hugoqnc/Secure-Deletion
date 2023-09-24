@@ -2,14 +2,14 @@
 \label{chap:conclusion}
 
 % Recap what we have designed and implemented, and the core idea
-In conclusion, this thesis has successfully extended the methodology developed by Arquint et al. for the modular verification of security protocol implementations, adding support for the specification of time-sensitive data and enforcing their secure deletion at the end of their lifetime.
+In conclusion, this thesis has successfully extended the methodology developed by Arquint et al.~\cite{ArquintSchwerhoffMehtaMueller23} for the modular verification of security protocol implementations, adding support for the specification of time-sensitive data and enforcing their secure deletion at the end of their lifetime.
 To the best of our knowledge, our contributions enable for the first time the verification of strong security properties relying on the secure deletion of sensitive data for real-world protocol implementations.
 By building upon standard separation logic predicates, the extended methodology remains agnostic to programming languages.
 
-The generic extension we introduced is flexible enough to verify various protocol implementations that use ephemeral data, such as Signal and its key rotation scheme. Our methodology can be used to prove strong security properties like forward secrecy and post-compromise security.
+The generic extension we introduced is flexible enough to verify various protocol implementations that use ephemeral data, such as Signal~\cite{marlinspike2016x3dh} and its key rotation scheme. Our methodology can be used to prove strong security properties like forward secrecy and post-compromise security.
 
-Furthermore, we have enlarged the Reusable Verification Library for Go to contain our methodology extension.
-Using a solution inspired by counting permissions, we provide the library with the ability to track sensitive values in a protocol implementation and ensure that they are deleted in a timely manner.
+Furthermore, we have enlarged the Reusable Verification Library~\cite{ArquintSchwerhoffMehtaMueller23} for Go to contain our methodology extension.
+Using a solution inspired by counting permissions~\cite{roshardt2021extending}, we provide the library with the ability to track sensitive values in a protocol implementation and ensure that they are deleted in a timely manner.
 By implementing this solution in several functions of the library, we facilitate the work of the developer by ensuring in a sound way that the values they create can only exist during the periods of time specified for these values.
 
 % Explain how the case study shows that our methodology works
@@ -33,7 +33,7 @@ In the next and final section, we propose some ideas for future work that could 
 The case study presented in chapter \ref{chap:case-study} could be completed by following the path we have outlined in section \ref{sec:remaining-work}, resulting in the verification of forward secrecy and post-compromise security for this protocol implementation.
 
 \paragraph{Adding obligation support to Gobra.}
-As discussed in detail in section \ref{sec:alternative-design-using-obligations}, adding obligations to Gobra would allow us to implement a simpler and more elegant solution for tracking sensitive values.
+As discussed in detail in section \ref{sec:alternative-design-using-obligations}, adding obligations~\cite{bostrom2014modular} to Gobra~\cite{wolf2021gobra} would allow us to implement a simpler and more elegant solution for tracking sensitive values.
 This may result in a more intuitive methodology and simpler specification for library functions that developers can use more easily.
 
 \paragraph{Improving how the methodology handles AEAD.}

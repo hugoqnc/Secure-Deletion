@@ -2,7 +2,7 @@
   Security protocols are crucial for protecting sensitive information and communications in today's digital age. Even a minor flaw in how these protocols are implemented can lead to serious consequences.
   Hence, proving the implementations secure is attractive as we prove the absence of such flaws.
 
-  Arquint et al. \cite{} propose a generic and modular methodology to verify the security of protocol implementations.
+  Arquint et al.~\cite{ArquintSchwerhoffMehtaMueller23} propose a generic and modular methodology to verify the security of protocol implementations.
   We extend their methodology to reason about ephemeral and time-sensitive data, which must be deleted within certain time frames.
   This enhancement allows us to verify strong security properties, such as forward secrecy and post-compromise security, for protocols that frequently renew their keys, such as Signal.
   Our contributions encompass a conceptual expansion of their methodology and an extension of their Go library, which simplifies the verification of protocol implementations in Go.
