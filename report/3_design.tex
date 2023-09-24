@@ -45,15 +45,16 @@ It is presented in Figure~\ref{fig:dh-ratchet}.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.9\textwidth]{figures/DH-ratchet.png}
-    \caption{Diffie-Hellman Ratchet protocol.}
+    \includegraphics[width=1.0\textwidth]{figures/DH-ratchet.png}
+    \caption{The Diffie-Hellman (DH) Ratchet~\cite{perrin2016double} is a continuous key agreement protocol between two participants, Alice and Bob, which repeatedly performs Diffie-Hellman key exchanges to encrypt each message with a new key.
+    Here, \texttt{AeadEnc(K, MSG, ad)} refers to the AEAD encryption of the message \texttt{MSG} with the key \texttt{K} and the associated data \texttt{ad}. \texttt{KDF(a, b)} refers to a key derivation function that derives a new key from two inputs \texttt{a} and \texttt{b}.
+    This figure is inspired by a similar figure from the DY* paper~\cite{bhargavan2021text}.}
     \label{fig:dh-ratchet}
 \end{figure}
-\todo{Change the figure to use my own protocol figure, and modify the caption to explain the figure more in detail}
 
 The protocol starts with an established communication key $K_0$, mutually shared by both participants.
 The initiator uses the responder's public key and a newly generated secret key to compute a shared Diffie-Hellman secret.
-This new shared secret and $K_0$ are input to a key derivation function to derive a new communication key $K_1$, which is used to encrypt a payload, i.e. \texttt{MSG\textsubscript{1}}.
+This new shared secret and $K_0$ are input to a key derivation function (KDF) to derive a new communication key $K_1$, which is used to encrypt a payload, i.e. \texttt{MSG\textsubscript{1}}.
 This step of generating a new key from the previous one is called a \emph{ratcheting step}.
 Behind this name, there is the idea of a ratchet, which one could turn in one direction to generate new keys, but that cannot be turned back, meaning that previous keys cannot be derived from the current one.
 Then, $K_1$ is used to encrypt the message sent to the responder, accompanied by the initiator's new DH public key $g^{x_1}$.
@@ -628,7 +629,6 @@ This means that it could be converted to the next version infinitely with the \t
 Although it works, converting this value for each version would be a verification burden in practice.
 This is why we offer an additional library function, provided in Figure~\ref{lst:guard-from-unversioned-receipt}, which checks if a value associated with a receipt is unversioned (lines 3-4), and if so returns the consumed \texttt{guard} permission (line 5).
 This conceptually removes the corresponding values from our deletion tracking mechanism.
-\todo{Weird to have a single word on the next page.}
 
 \begin{figure}
     \begin{gobra}

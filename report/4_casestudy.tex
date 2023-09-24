@@ -83,18 +83,24 @@ For the sake of readability, we now refer in the remainder of the thesis to our 
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.9\textwidth]{figures/DH-ratchet-modified.png}
-    \caption{Our \emph{ratcheting protocol}, a modified protocol based on the Diffie-Hellman Ratchet.}
+    \includegraphics[width=1.0\textwidth]{figures/DH-ratchet-modified.png}
+    \caption{Our \emph{ratcheting protocol}: a modified protocol based on the Diffie-Hellman Ratchet, in which the decryption key is computed using the previous DH public key instead of the just-received one.
+    Here, \texttt{AeadEnc(K, MSG, ad)} refers to the AEAD encryption of the message \texttt{MSG} with the key \texttt{K} and the associated data \texttt{ad}. \texttt{KDF(a, b)} refers to a key derivation function that derives a new key from two inputs \texttt{a} and \texttt{b}.
+    Green bubbles are linked to versioned values, and the numbers in the bubble indicate the versions in which the value can be read from the participant's point of view. For example, the top-left bubble indicates that $x_0$ can be read in versions $0$ and $1$ of Alice's current session.}
     \label{fig:dh-ratchet-modified}
 \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.9\textwidth]{figures/DH-ratchet-modified-first.png}
-    \caption{First communication round after the handshake.}
+    \includegraphics[width=1.0\textwidth]{figures/DH-ratchet-modified-first.png}
+    \caption{First communication round happening after the IKpsk2 handshake.
+    It uses the shared keys $K_{IR}$ and $K_{RI}$ established by the handshake to authenticate the DH public keys $g^{x_0}$ and $g^{y_0}$ of the initiator and responder respectively.
+    This exchange of public keys is necessary to initiate the ratcheting protocol, as it provides the required prior knowledge.
+    \texttt{AeadEnc(K, MSG, ad)} refers to the AEAD encryption of the message \texttt{MSG} with the key \texttt{K} and the associated data \texttt{ad}.
+    Like in Figure~\ref{fig:dh-ratchet-modified}, green bubbles are linked to versioned values, and the numbers in the bubble indicate the versions in which the value can be read from the participant's point of view.
+    }
     \label{fig:dh-ratchet-modified-first}
 \end{figure}
-\todo{Change the figures~\ref{fig:dh-ratchet-modified} and~\ref{fig:dh-ratchet-modified-first} to use cleaner ones, and modify the caption to explain the figures more in detail}
 
 The intuition behind the ratcheting protocol is that we replicate the DH Ratchet protocol, but instead of using the just-received public key, we use the public key received in the previous message to compute the shared secret.
 This first requires us to modify the prior knowledge of the participants. Now, in addition to the initial shared secret $K_0$, both participants need to know the other's DH public key and their (versioned) DH private key.
@@ -108,7 +114,7 @@ Upon reception of this message by the responder, instead of using the public key
 This allows the responder to obtain $K_1$, decrypt the message, and obtain the associated message invariant containing information about the new public key $g^{x_1}$.
 Then, $g^{x_1}$ is used just after by the responder to compute the next shared secret $K_2$, which is used to encrypt the next message sent to the initiator.
 The same observations can be made upon reception of the second message by the initiator, and all subsequent messages. 
-\todo{Depending on how precise the final Figure~\ref{fig:dh-ratchet-modified} is, I may need to explain the difference between the first message and the others: we do not delete the unversioned key $K_0$}
+% \todo{Depending on how precise the final Figure~\ref{fig:dh-ratchet-modified} is, I may need to explain the difference between the first message and the others: we do not delete the unversioned key $K_0$}
 
 This ratcheting protocol is therefore simpler to verify than the DH Ratchet and aims to provide similar security properties.
 Intuitively, forward secrecy still holds because past communication keys are deleted and cryptographically not retrievable from long-term secrets and current communication keys.
