@@ -30,14 +30,14 @@ In the next and final section, we propose some ideas for future work that could 
 %   - Implement obligations in Gobra
 
 \paragraph{Finishing the case study.}
-The case study presented in chapter \ref{chap:case-study} could be completed by following the path we have outlined in section \ref{sec:remaining-work}, resulting in the verification of forward secrecy and post-compromise security for this protocol implementation.
+The case study presented in chapter~\ref{chap:case-study} could be completed by following the path we have outlined in section~\ref{sec:remaining-work}, resulting in the verification of forward secrecy and post-compromise security for this protocol implementation.
 
 \paragraph{Adding obligation support to Gobra.}
-As discussed in detail in section \ref{sec:alternative-design-using-obligations}, adding obligations~\cite{bostrom2014modular} to Gobra~\cite{wolf2021gobra} would allow us to implement a simpler and more elegant solution for tracking sensitive values.
+As discussed in detail in section~\ref{sec:alternative-design-using-obligations}, adding obligations~\cite{bostrom2014modular} to Gobra~\cite{wolf2021gobra} would allow us to implement a simpler and more elegant solution for tracking sensitive values.
 This may result in a more intuitive methodology and simpler specification for library functions that developers can use more easily.
 
 \paragraph{Improving how the methodology handles AEAD.}
-When choosing the protocol to verify for our case study, in section \ref{sec:chosen-protocol}, we had to slightly adapt the original Diffie-Hellman ratchet protocol to make it more easily verifiable.
+When choosing the protocol to verify for our case study, in section~\ref{sec:chosen-protocol}, we had to slightly adapt the original Diffie-Hellman ratchet protocol to make it more easily verifiable.
 The reason for this comes from how the current methodology handles AEAD decryption, which hinders our ability to decrypt the message using a key that is derived from the associated data we just received.
 In future work, we could analyze how ratcheting protocols use associated data before computing the necessary decryption key.
 In particular, we should reconsider the preconditions and postconditions of the AEAD decryption function such that we can invoke this function in these situations and soundly obtain the associated message invariant unless the ciphertext has been created by the attacker.

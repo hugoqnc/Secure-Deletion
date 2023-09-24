@@ -36,13 +36,13 @@ Signal~\cite{marlinspike2016x3dh} is a state-of-the-art protocol, whose verifica
 However, we do not consider that we have sufficient time to verify such a complex protocol implementation in the scope of this thesis.
 Optimally, we would like to verify a protocol implementation that uses the same principles of ephemeral keys and ratcheting to achieve comparable security properties.
 
-Such a protocol exists and has already been introduced in section \ref{sec:diffie-hellman-ratchet}: the Diffie-Hellman (DH) Ratchet~\cite{perrin2016double}.
+Such a protocol exists and has already been introduced in section~\ref{sec:diffie-hellman-ratchet}: the Diffie-Hellman (DH) Ratchet~\cite{perrin2016double}.
 Recall that the DH Ratchet is the core component of the Signal protocol. Participants frequently exchange their Diffie-Hellman public keys and use them to obtain a shared secret that is used to derive new ephemeral keys to encrypt their messages.
 The DH Ratchet aims to provide both forward secrecy and post-compromise security, which are the same security properties that Signal aims to achieve.
 If the DH Ratchet can provide the same guarantees as the more complex Signal protocol, it is because the DH Ratchet uses a simpler communication model, where participants alternate sending and receiving messages.
 In Signal, the protocol has to cope with a participant sending multiple messages in a row, as well as out-of-order and lost messages.
 
-While the DH Ratchet now appears to be a good candidate for our case study, we have to handle the fact that it requires some prior knowledge, as it was shown in Figure \ref{fig:dh-ratchet} page \pageref{fig:dh-ratchet}.
+While the DH Ratchet now appears to be a good candidate for our case study, we have to handle the fact that it requires some prior knowledge, as it was shown in Figure~\ref{fig:dh-ratchet} page \pageref{fig:dh-ratchet}.
 We need to provide the initiator and responder with a shared secret $K_0$, which will be the initial key of their key chain.
 Additionally, we need to provide the initiator with the public key $g^{y_0}$ of the responder, where $y_0$ is the private of the responder.
 We cannot use the DH Ratchet without this prior knowledge, which requires us to add an initial key agreement to the protocol.
@@ -66,11 +66,11 @@ Therefore, by combining the IKpsk2 handshake with this additional communication 
 At this point, we have already successfully adapted the WireGuard protocol to perform Signal-like key ratcheting.
 However, we explain in the following paragraphs how we made an additional modification to simplify the verification process of this protocol.
 
-Recall the original ratcheting process that we presented in Figure \ref{fig:dh-ratchet} (page \pageref{fig:dh-ratchet}); when the initiator sends a message encrypted by a key $K_1$ to the responder together with its new public key $g^{x_1}$, the responder uses this public key $g^{x_1}$ to compute the shared secret $K_1$ and decrypt the message.
+Recall the original ratcheting process that we presented in Figure~\ref{fig:dh-ratchet} (page \pageref{fig:dh-ratchet}); when the initiator sends a message encrypted by a key $K_1$ to the responder together with its new public key $g^{x_1}$, the responder uses this public key $g^{x_1}$ to compute the shared secret $K_1$ and decrypt the message.
 Typically, the public key $g^{x_1}$ is sent in the associated data of the AEAD encrypted message, so its integrity is protected, but it remains publicly readable so the responder can immediately access it to compute $K_1$.
 
 In the existing methodology and its current implementation, the Reusable Verification Library, the message comes with a (ghost) \emph{message invariant}. It is a property, part of the trace invariant, about the content of the message used for verification purposes. Upon encrypting the message to send, the initiator has to prove this message invariant, and upon receiving and decrypting the message, the responder obtains the message invariant unless corruption has occurred, in which case the message was potentially sent by the attacker.
-In our case, for the first message sent by the initiator on Figure \ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would specify that $g^{x_1}$ is a Diffie-Hellman public key with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
+In our case, for the first message sent by the initiator on Figure~\ref{fig:dh-ratchet}, the message invariant would contain information about the public key $g^{x_1}$. In particular, it would specify that $g^{x_1}$ is a Diffie-Hellman public key with base generator $g$ and exponent $x_1$, where $x_1$ is a nonce readable by the initiator.
 This information can then be used for verification purposes on the responder side, notably to know that $g^{x_1y_0}$ is a Diffie-Hellman shared secret.
 
 However, in our case, the message invariant is obtained only \emph{after} decrypting the message.
@@ -78,7 +78,7 @@ However, we would need to know that $g^{x_1y_0}$ is a shared secret \emph{before
 In particular, the decryption function requires us to prove that $K_1$ is a valid AEAD decryption key, which in turn requires us to know that $g^{x_1y_0}$ is a shared secret.
 
 This is why we slightly modified the DH Ratchet protocol to make it verifiable with our existing methodology and library.
-We present our modified protocol in Figure \ref{fig:dh-ratchet-modified}, and our new first communication round (running after the IKpsk2 handshake) in Figure \ref{fig:dh-ratchet-modified-first}.
+We present our modified protocol in Figure~\ref{fig:dh-ratchet-modified}, and our new first communication round (running after the IKpsk2 handshake) in Figure~\ref{fig:dh-ratchet-modified-first}.
 For the sake of readability, we now refer in the remainder of the thesis to our modified DH Ratchet protocol as the \emph{ratcheting protocol}. Additionally, we will refer to the entire protocol that we verify, i.e. the IKpsk2 handshake followed by the first communication round and the ratcheting protocol, as the \emph{full ratcheting protocol}.
 
 \begin{figure}
@@ -94,21 +94,21 @@ For the sake of readability, we now refer in the remainder of the thesis to our 
     \caption{First communication round after the handshake.}
     \label{fig:dh-ratchet-modified-first}
 \end{figure}
-\todo{Change the figures \ref{fig:dh-ratchet-modified} and \ref{fig:dh-ratchet-modified-first} to use cleaner ones, and modify the caption to explain the figures more in detail}
+\todo{Change the figures~\ref{fig:dh-ratchet-modified} and~\ref{fig:dh-ratchet-modified-first} to use cleaner ones, and modify the caption to explain the figures more in detail}
 
 The intuition behind the ratcheting protocol is that we replicate the DH Ratchet protocol, but instead of using the just-received public key, we use the public key received in the previous message to compute the shared secret.
 This first requires us to modify the prior knowledge of the participants. Now, in addition to the initial shared secret $K_0$, both participants need to know the other's DH public key and their (versioned) DH private key.
-This is the purpose of the new first communication round shown in Figure \ref{fig:dh-ratchet-modified-first}. 
+This is the purpose of the new first communication round shown in Figure~\ref{fig:dh-ratchet-modified-first}. 
 The initiator first sends its public key $g^{x_0}$ to the responder, authenticated with the symmetric key $K_{IR}$ established by the handshake. Then, the responder replies with its authenticated public key $g^{y_0}$.
 
-Coming back to the ratcheting protocol shown in Figure \ref{fig:dh-ratchet-modified}, when computing the first shared secret $K_1$, the initiator uses its private key $x_0$, whose associated public key $g^{x_0}$ is already known by the responder, from the first communication round.
+Coming back to the ratcheting protocol shown in Figure~\ref{fig:dh-ratchet-modified}, when computing the first shared secret $K_1$, the initiator uses its private key $x_0$, whose associated public key $g^{x_0}$ is already known by the responder, from the first communication round.
 This was not the case in the DH Ratchet protocol.
 The first message sent by the initiator to the responder is otherwise the same as in the DH Ratchet protocol and contains the initiator's new authenticated public key $g^{x_1}$ in addition to the encrypted message.
 Upon reception of this message by the responder, instead of using the public key $g^{x_1}$ to compute the shared secret $K_1$, the responder uses the previous public key $g^{x_0}$ received in the first communication round.
 This allows the responder to obtain $K_1$, decrypt the message, and obtain the associated message invariant containing information about the new public key $g^{x_1}$.
 Then, $g^{x_1}$ is used just after by the responder to compute the next shared secret $K_2$, which is used to encrypt the next message sent to the initiator.
 The same observations can be made upon reception of the second message by the initiator, and all subsequent messages. 
-\todo{Depending on how precise the final Figure \ref{fig:dh-ratchet-modified} is, I may need to explain the difference between the first message and the others: we do not delete the unversioned key $K_0$}
+\todo{Depending on how precise the final Figure~\ref{fig:dh-ratchet-modified} is, I may need to explain the difference between the first message and the others: we do not delete the unversioned key $K_0$}
 
 This ratcheting protocol is therefore simpler to verify than the DH Ratchet and aims to provide similar security properties.
 Intuitively, forward secrecy still holds because past communication keys are deleted and cryptographically not retrievable from long-term secrets and current communication keys.
@@ -140,7 +140,7 @@ The protocol is therefore healed and achieves post-compromise security.
 % Our ratcheting protocol therefore verifies post-compromise security with a marginally weaker security property than the DH Ratchet protocol.
 
 % Recall that post-compromise security \emph{via state} considers that some secret data remains known only by the participants after a compromise.
-% With the DH Ratchet protocol, we assumed that the attacker compromised Alice's $K_n$ key (and state) \emph{after} she derived $K_{n+1}$, and this assumption was enough to obtain post-compromise security (section \ref{sec:security-properties}).
+% With the DH Ratchet protocol, we assumed that the attacker compromised Alice's $K_n$ key (and state) \emph{after} she derived $K_{n+1}$, and this assumption was enough to obtain post-compromise security (section~\ref{sec:security-properties}).
 % However, this does not hold in this case.
 % Suppose we have two participants Alice and Bob communicating, and that an attacker compromises Alice's state at the time when she computed $K_n$ after receiving a message.
 % The attacker knows $K_n$, but also Alice's ephemeral private key $x_{n-1}$ and Bob's just-received public key $g^{y_{n-1}}$.
@@ -170,13 +170,13 @@ Finally, we explain how corruption is handled in the methodology and how we can 
 \subsection{Ratcheting using a key derivation function}
 \label{sec:ratcheting-using-a-key-derivation-function}
 
-In section \ref{sec:creating-values-with-multiple-versions-for-ratcheting}, we explained how we designed our methodology to support key ratcheting, namely the derivation of a new key, versioned with a later version, from the previous one.
+In section~\ref{sec:creating-values-with-multiple-versions-for-ratcheting}, we explained how we designed our methodology to support key ratcheting, namely the derivation of a new key, versioned with a later version, from the previous one.
 However, note that for now, we have not discussed the concrete specification and implementation of the ratcheting step. In particular, we have not discussed how we could obtain a $(v+1)$-versioned key from a $v$-versioned key.
 % This is no coincidence, and we will explain why.
 
 In practice, this ratcheting step is implemented by a key derivation function (KDF), taking the previous key as one of its inputs and returning the new key.
 However, the precise KDF function used and the arguments it takes depend on the protocol. It is therefore not possible to provide a generic implementation of it in the library. This is why we have not discussed its implementation yet.
-For our case study, the KDF function specification is given in Figure \ref{lst:kdf-ratchet}.
+For our case study, the KDF function specification is given in Figure~\ref{lst:kdf-ratchet}.
 
 \begin{figure}
     \begin{gobra}
@@ -217,7 +217,7 @@ Instead, we show that the \texttt{dhss} term has to be $(v+1)$-versioned, theref
 
 The shared secret $\texttt{dhss} = g^{xy}$ is obtained by exponentiating the public key $g^y$ of the other participant with our private key $x$.
 As $x$ is our key, we get to define its secrecy label at creation. 
-In our ratcheting protocol, $x$ is meant to be an ephemeral private used to derive the two next shared communication keys $K_n$ and $K_{n+1}$ (the first one for receiving and the other for sending, where $n$ is even and odd for Alice and Bob respectively), as shown in Figure \ref{fig:dh-ratchet-modified}.
+In our ratcheting protocol, $x$ is meant to be an ephemeral private used to derive the two next shared communication keys $K_n$ and $K_{n+1}$ (the first one for receiving and the other for sending, where $n$ is even and odd for Alice and Bob respectively), as shown in Figure~\ref{fig:dh-ratchet-modified}.
 As we want to use $x$ to obtain a shared secret for the next round of communication, we make it readable in version $v+1$. Because any value also needs to be readable in the current version, $x$ is given the label $[(p,s,v),(p,s,v+1)]$, where $p$ and $s$ are the respective participant and session creating $x$.
 From the message invariant, we obtain that $y$ is readable by the other participant $p'$. Because $p$ does not need to precisely know in which session and version $y$ is readable by $p'$, the message invariant only gives us the simplified secrecy label $[(p')]$ for $y$.
 Then, the labeling rules defined in the existing library state that the secrecy label of the shared secret $g^{xy}$ is the union of $x$ and $y$'s secrecy labels, which is $[(p,s,v),(p,s,v+1),(p')]$.
@@ -234,7 +234,7 @@ Therefore, we have adapted our labeling rule and shown that following our ratche
 \subsection{Usages and message invariants}
 \label{sec:usages-and-message-invariants}
 
-In section \ref{sec:chosen-protocol}, we discussed how message invariants are crucial to the verification of our ratcheting protocol.
+In section~\ref{sec:chosen-protocol}, we discussed how message invariants are crucial to the verification of our ratcheting protocol.
 Recall that they are a property proven by the initiator upon AEAD encryption of a message, and obtained by the responder upon AEAD decryption of the received message.
 It is important to note that each kind of message needs its message invariant.
 In our case, we have several kinds of messages: a variety of messages used in the IKpsk2 handshake, the messages used in the first communication round, and the messages used in all subsequent rounds in the ratcheting protocol.
@@ -264,7 +264,7 @@ This simplifies the specification of message invariants because we can distingui
 \subsection{First communication round}
 \label{sec:first-communication-round}
 
-As shown in Figure \ref{fig:dh-ratchet-modified-first}, the first communication round is a little different from the other rounds.
+As shown in Figure~\ref{fig:dh-ratchet-modified-first}, the first communication round is a little different from the other rounds.
 Before it starts, the initiator and responder have a shared secret $K_0$ resulting from WireGuard's handshake.
 The goal of this first round is to send authenticated public keys to each other so that they can start the ratcheting protocol.
 
@@ -274,7 +274,7 @@ However, by also adapting the handshake and thus increasing verification efforts
 
 But because $K_0$ is not versioned, we do not have a \texttt{receipt} for it.
 This means that we cannot call the \texttt{DeleteSafely} function on it, as it requires such a receipt to consume it.
-This has an impact on the second communication round, more particularly on the initiator's first send and the responder's first receive of the ratcheting protocol, shown in Figure \ref{fig:dh-ratchet-modified}.
+This has an impact on the second communication round, more particularly on the initiator's first send and the responder's first receive of the ratcheting protocol, shown in Figure~\ref{fig:dh-ratchet-modified}.
 Indeed, these functions were the ones supposed to delete $K_0$ if it was versioned.
 As they do not, the preconditions and postconditions of these functions may carry different amounts of guard and receipt permissions compared to all subsequent rounds.
 This has to be kept in mind when working on verifying the protocol implementation in compliance with the requirements of the deletion mechanism.
@@ -290,13 +290,13 @@ Indeed, the more frequently we increment the session's version, the more we can 
 Of course, there is no point in incrementing the version \emph{too} frequently.
 If no data has been deleted between two versions, the last version increment is unnecessary and only results in added verification complexity without benefits.
 
-In the case of our ratcheting protocol, we notice that with the notations of the Figure \ref{fig:dh-ratchet-modified}, for $n>0$, the initiator's private key $x_n$ is used in the computation of the communication keys $K_{2n}$ and $K_{2n+1}$. We can obtain a similar result for the responder.
+In the case of our ratcheting protocol, we notice that with the notations of the Figure~\ref{fig:dh-ratchet-modified}, for $n>0$, the initiator's private key $x_n$ is used in the computation of the communication keys $K_{2n}$ and $K_{2n+1}$. We can obtain a similar result for the responder.
 We also notice that we delete a key $K_{2n}$ just after we derive the next key $K_{2n+1}$.
 As a first intuition, it would seem natural to increment the session's version just after we derive $K_{2n+1}$ so that we force the deletion of $K_{2n}$ at this point.
 However, doing so is not possible.
 Indeed, at each round, a participant first derives a receiving key $K_{2n}$ and then a sending key $K_{2n+1}$, using the \texttt{ComputeKDFRatchet} function.
 While they use a different Diffie-Hellman shared secret to derive each key, both shared secrets use the same private key $x_n$.
-Recalling the explanations about the labeling of the KDF result given in section \ref{sec:ratcheting-using-a-key-derivation-function}, we see that the secrecy label of $x_{n}$ defines the secrecy label of the KDF results $K_{2n}$ and $K_{2n+1}$ for the calling participant.
+Recalling the explanations about the labeling of the KDF result given in section~\ref{sec:ratcheting-using-a-key-derivation-function}, we see that the secrecy label of $x_{n}$ defines the secrecy label of the KDF results $K_{2n}$ and $K_{2n+1}$ for the calling participant.
 Because the part of the secrecy label about the other participant $p'$ is always the same, $(p')$, the secrecy label of $K_{2n}$ and $K_{2n+1}$ is the same.
 % This means that for a participant $p$ in session $s$ calling the \texttt{ComputeKDFRatchet} function to derive $K_n$ and then $K_{n+1}$, the part of the secrecy label specifying their permissions is the same for both keys.
 Therefore, as we give $x_{n}$ the label $[(p,s,n),(p,s,n+1)]$, the secrecy label of $K_{2n}$ and $K_{2n+1}$ is $[(p,s,n),(p,s,n+1),(p')]$.
@@ -322,9 +322,9 @@ In this case, we were not forced yet to delete $K_{2n}$ and $x_{n}$, because we 
 However, we will be forced to delete these two values at the end of the next receive, when we will increment the session's version to $n+2$.
 This granularity should be sufficient to later express our security properties.
 
-Now that we have decided on the granularity of our versioning, we simply follow the requirements of the deletion mechanism that we described in section \ref{sec:extension-of-the-library}.
+Now that we have decided on the granularity of our versioning, we simply follow the requirements of the deletion mechanism that we described in section~\ref{sec:extension-of-the-library}.
 These requirements mostly consist of specifying the “correct” amount of \texttt{guard} and \texttt{receipt} permissions in function calls. 
-Additionally, recall the \texttt{ConvertToNextVersion} function introduced in section \ref{sec:conversion-function}.
+Additionally, recall the \texttt{ConvertToNextVersion} function introduced in section~\ref{sec:conversion-function}.
 The developer will have to convert values labeled with multiple versions (private keys $x$ and communication keys $K$) when necessary, to keep using them in the next session's version.
 
 \begin{figure}
@@ -354,7 +354,7 @@ func SendMessage(K []byte, privKey []byte, iter int, ghost v uint32,
     \label{lst:send-message}
 \end{figure}
 
-To give a final intuition about the actual reasoning that the developer has to do to comply with the deletion mechanism, we give in Figure \ref{lst:send-message} the preconditions and postconditions related to the \texttt{guard} and \texttt{receipt} predicates of the initiator's send function.
+To give a final intuition about the actual reasoning that the developer has to do to comply with the deletion mechanism, we give in Figure~\ref{lst:send-message} the preconditions and postconditions related to the \texttt{guard} and \texttt{receipt} predicates of the initiator's send function.
 The case \texttt{iter == 0} corresponds to the send operation in the first communication round. Here, a fraction of \texttt{guard(v)}, where $v$ is the current version, is necessary to create the new Diffie-Hellman private key \texttt{newPrivKey}. As it is created with a label $[(p,s,v),(p,s,v+1)]$, we then convert it to the next version $v+1$. This consumes the fraction of \texttt{guard(v+1)} and returns both a fraction of \texttt{receipt(newPrivKey, v+1)} and a fraction of \texttt{guard(v)}.
 The case \texttt{iter == 1} corresponds to the second send operation of the initiator, so to the first send operation of the ratcheting protocol. Compared to previously, we additionally need another \texttt{guard(v)} fraction to compute the initial KDF, which in turn returns a \texttt{receipt(newK, v)} fraction. And we delete the previous private key, consuming the \texttt{receipt(privKey, v)} fraction and returning a \texttt{guard(v)} fraction.
 Finally, the case \texttt{iter > 1} is the same as before but with the additional deletion of the previous communication key, consuming the \texttt{receipt(K, v)} fraction and returning an additional \texttt{guard(v)} fraction.
@@ -368,7 +368,7 @@ Corruption is a crucial notion to consider when verifying a protocol, as we need
 For example, post-compromise security states that a key remains secret even if the attacker has corrupted certain versions in the past.
 
 In the Reusable Verification Library, corruption is modeled upon receiving and decrypting an AEAD encrypted message. 
-Recall from section \ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender, unless the attacker performed the encryption.
+Recall from section~\ref{sec:chosen-protocol} that upon decryption, we obtain a message invariant containing properties about the message that were proved by the sender, unless the attacker performed the encryption.
 In the latter case, the attacker must have computed the encryption and accessed the encryption key and message, i.e. the secrecy labels of the encryption key and the message must flow to \emph{Public}.
 % To be precise, we either obtain this message invariant, or we do not and we thus learn that the message comes from the attacker.
 % In the latter case, corruption is modeled by learning that the message and its encryption key are known to the attacker, i.e. that their secrecy labels flow to \emph{Public}.
@@ -407,7 +407,7 @@ We list the missing parts of the verification work and we provide a clear path t
 First, we need to satisfy the AEAD encryption requirements in the corrupted case.
 Upon encryption, the current methodology requires us among others to prove that the encryption key has an appropriate usage.
 A usage is defined as “appropriate” for AEAD encryption by the developer in the \texttt{GetUsage} function.
-In our case, the usages \texttt{KVersIrUsage}, \texttt{KVersRiUsage}, \texttt{KVersIrUsage} and \texttt{KVersRiUsage} defined in section \ref{sec:usages-and-message-invariants} are defined as being appropriate for AEAD encryption.
+In our case, the usages \texttt{KVersIrUsage}, \texttt{KVersRiUsage}, \texttt{KVersIrUsage} and \texttt{KVersRiUsage} defined in section~\ref{sec:usages-and-message-invariants} are defined as being appropriate for AEAD encryption.
 However, in the corrupted case, we do not know the usage of the received associated data, which we expect to be the other participant's public key.
 The current usage rules prevent us from proving that the shared secret obtained from this public key and our private key has a \emph{DH Shared Secret} usage.
 Hence, we cannot show that the encryption key obtained with \texttt{KDFRatchet} from the previous key and this shared secret has an appropriate usage for AEAD encryption.
@@ -432,7 +432,7 @@ $K_n$ remains secret unless the attacker compromises the version $v$ or $v+1$ of
 However, our secrecy property is currently weaker than it could be, as the secrecy label of $K_n$ contains $p'$, which expresses that $K_n$ can be obtained by the attacker if they compromise $p'$ at any time.
 This property could be strengthened, as we can intuitively see that $K_n$ is also available in only two versions of a session $s'$ of $p'$.
 We leave it to future work to show that, when $p$ is the initiator and for $n>0$, the secrecy label of $K_{2n}$ can be strengthened to $[(p,s,n),(p,s,n+1),(p',s',n-1),(p',s',n)]$ and the secrecy label of $K_{2n+1}$ can be strengthened to $[(p,s,n),(p,s,n+1),(p',s',n),(p',s',n+1)]$.
-Showing this requires tightening the message invariant that we initially introduced in section \ref{sec:ratcheting-using-a-key-derivation-function}. 
+Showing this requires tightening the message invariant that we initially introduced in section~\ref{sec:ratcheting-using-a-key-derivation-function}. 
 
 % This means that $K_n$ remains secret even if the attacker compromises a version $v_{corrupted} \in \mathbb{N} \setminus \{v, v+1\}$ of the session $s$ of participant $p$, or a version $v'_{corrupted} \in \mathbb{N} \setminus \{v', v'+1\}$ of the session $s'$ of participant $p'$.
 Then, we can express that the key $K_{2n+1}$ remains secret unless the previous key $K_{2n}$ was made public before $K_{2n+1}$ was computed, or unless the attacker compromises a version $n$ or $n+1$ of the session $s$ of participant $p$ or of the session $s'$ of participant $p'$.
@@ -447,7 +447,7 @@ This will require some modifications to existing annotations, including strength
 \label{sec:results}
 
 We finish this case study by reporting some quantitative results about the verification of our full ratcheting protocol.
-Figure \ref{fig:results} provides the number of lines of code (LOC), the number of lines of specification (LOS) and the verification time for the implementations of the full ratcheting protocol and the original WireGuard.
+Figure~\ref{fig:results} provides the number of lines of code (LOC), the number of lines of specification (LOS) and the verification time for the implementations of the full ratcheting protocol and the original WireGuard.
 The number of lines of specification does not count the lines of the Reusable Verification Library, and the verification time does not include the time to verify the library.
 This is justified because the library is protocol-independent and can be verified once and for all.
 

@@ -85,7 +85,7 @@ func multiply(a, b *int) (product int) {
     assert product == 0 ==> (*a == 0 || *b == 0)
 }
     \end{gobra}
-    \caption{This function returns the product of two positive integers. This is the same example as in Figure \ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3). Removing line 1 would result in a verification error.}
+    \caption{This function returns the product of two positive integers. This is the same example as in Figure~\ref{lst:multiply-example}, but this time reading \texttt{a} and \texttt{b} from heap locations. Notice that we require read permissions (line 1), which we can return at the end of the function (line 3). Removing line 1 would result in a verification error.}
     \label{lst:multiply-example-heap}
 \end{figure}
 
@@ -233,7 +233,7 @@ To do so, they use that separation logic's resources are not duplicable, so if a
 This can be used to express the uniqueness of an event and prove that an implementation detects if an attacker replays messages, which is necessary to satisfy injective agreement.
 Because DY*'s invariant is expressed in first-order logic, it is unclear how they could reason about the uniqueness of particular events.
 
-Similarly to DY*, this methodology comes with a library, called the Reusable Verification Library, that allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
+Similarly to DY*, this methodology comes with a library, called the Reusable Verification Library, which allows the reuse of protocol-independent parts (verified only once) across different protocol implementations.
 Because they are using Gobra, verification is based on separation logic, which allows us to reason about heap manipulations.
 Currently, any creation of an array of bytes (i.e. creation of nonce, keys, etc.) is controlled by a memory predicate \texttt{Mem}.
 The \texttt{Mem} predicate is used to abstract over the memory of a byte array and thus specifies permissions to every byte in the array.

@@ -30,7 +30,6 @@ However, such reasoning is necessary for proving security properties like forwar
 Forward secrecy informally guarantees that past keys remain secret even when newer keys or long-term keys become known to the attacker.
 It is crucial for secure communication, as it ensures that an attacker cannot decrypt past messages even if they manage to compromise a participant later on.
 Post-compromise security informally means that a participant can communicate securely with a peer, even when certain secrets from the past have leaked.
-%even if the peer’s secrets have already been (partly) compromised \cite{}.
 This is sometimes referred to as \emph{healing}, which allows communication to resume securely at some point after a compromise.
 Protocols like Signal achieve both of these properties by using a key rotation scheme within a protocol session, where a communication key is used to generate its successor and is then deleted.
 
@@ -50,10 +49,10 @@ Finally, we evaluate our methodology and our extension of the Go Reusable Verifi
 
 The remainder of this thesis proceeds as follows.
 
-In Chapter \ref{chap:background}, we introduce the necessary background knowledge for this thesis, including an introduction to the verification of Go programs, a review of existing works aiming at verifying protocol implementations, and explanations of basic cryptography concepts.
+In Chapter~\ref{chap:background}, we introduce the necessary background knowledge for this thesis, including an introduction to the verification of Go programs, a review of existing works aiming at verifying protocol implementations, and explanations of basic cryptography concepts.
 
-In Chapter \ref{chap:design}, we first present the conceptual idea behind our methodology to verify protocol implementations relying on ephemeral data. We then explain how we extended the Go Reusable Verification Library to support our methodology.
+In Chapter~\ref{chap:design}, we first present the conceptual idea behind our methodology to verify protocol implementations relying on ephemeral data. We then explain how we extended the Go Reusable Verification Library to support our methodology.
 
-In Chapter \ref{chap:case-study}, we present a case study of our methodology on a Signal-like protocol implementation, and explain how we can use the library to verify strong security properties for this implementation.
+In Chapter~\ref{chap:case-study}, we present a case study of our methodology on a Signal-like protocol implementation, and explain how we can use the library to verify strong security properties for this implementation.
 
-Finally, in Chapter \ref{chap:conclusion}, we conclude and discuss future work.
+Finally, in Chapter~\ref{chap:conclusion}, we conclude and discuss future work.
