@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you mention this Master's thesis or use this software, please cite it as below."
+authors:
+- family-names: "Queinnec"
+  given-names: "Hugo"
+title: "Secure Deletion of Sensitive Data in Protocol Implementations"
+date-released: 2023-09-24
+url: "https://github.com/hugoqnc/Secure-Deletion"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Queinnec"
+    given-names: "Hugo"
+  title: "Secure Deletion of Sensitive Data in Protocol Implementations"
+  year: 2023

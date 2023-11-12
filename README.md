@@ -1,7 +1,20 @@
 # Secure Deletion of Sensitive Data in Protocol Implementations
-**Hugo Queinnec, 2023**
+**Master's Thesis — ETH Zürich — Hugo Queinnec — 2023**
 
-This repo contains the source code associated to this Master's thesis, as well as the Latex source files of the project description and the final report.
+[![Hello](https://img.shields.io/badge/read%20the%20report-blue?style=for-the-badge&logo=none)](https://ethz.ch/content/dam/ethz/special-interest/infk/chair-program-method/pm/documents/Education/Theses/Hugo_Queinnec_MA_Thesis.pdf)
+
+## Abstract
+  Security protocols are crucial for protecting sensitive information and communications in today's digital age. Even a minor flaw in how these protocols are implemented can lead to serious consequences.
+  Hence, proving the implementations secure is attractive as we prove the absence of such flaws.
+
+  Arquint et al. propose a generic and modular methodology to verify the security of protocol implementations.
+  We extend their methodology to reason about ephemeral and time-sensitive data, which must be deleted within certain time frames.
+  This enhancement allows us to verify strong security properties, such as forward secrecy and post-compromise security, for protocols that frequently renew their keys, such as Signal.
+  Our contributions encompass a conceptual expansion of their methodology and an extension of their Go library, which simplifies the verification of protocol implementations in Go.
+  A case study, featuring a Signal-like protocol implementation, showcases expressiveness and practical applicability of our methodology extension.
+
+## Repository
+This repository contains the source code associated to this Master's thesis, as well as the Latex source files of the project description and the final report.
 It is organized as follows:
 - [`library`](./library/) contains the source code of the extended Reusable Verification Library in Go.
 - [`ratcheting-protocol`](./ratcheting-protocol) contains the source code of the full ratcheting protocol implementation (and specification) in Go. As explained in the report, this implementation is not yet complete.
