@@ -1,7 +1,7 @@
 # Secure Deletion of Sensitive Data in Protocol Implementations
 **Master's Thesis — ETH Zürich — Hugo Queinnec — 2023**
 
-[![Hello](https://img.shields.io/badge/read%20the%20report-blue?style=for-the-badge&logo=none)](https://ethz.ch/content/dam/ethz/special-interest/infk/chair-program-method/pm/documents/Education/Theses/Hugo_Queinnec_MA_Thesis.pdf)
+[![Hello](https://img.shields.io/badge/read%20the%20report-blue?style=for-the-badge&logo=none)](https://doi.org/10.3929/ethz-b-000641727)
 
 ## Abstract
   Security protocols are crucial for protecting sensitive information and communications in today's digital age. Even a minor flaw in how these protocols are implemented can lead to serious consequences.
